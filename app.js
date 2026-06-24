@@ -50,11 +50,14 @@ function stamp(iso) {
   const p = (n) => String(n).padStart(2, "0");
   if (isNaN(d)) return { date: "--", time: "", ymd: "00000000", hm: "0000", year: "----" };
   const dd = p(d.getDate()), mm = p(d.getMonth() + 1), yyyy = d.getFullYear();
+  const h24 = d.getHours();
+  const h12 = ((h24 + 11) % 12) + 1;
+  const ampm = h24 < 12 ? "AM" : "PM";
   return {
     date: `${dd}/${mm}/${yyyy}`,                 // dd/mm/yyyy
-    time: `${p(d.getHours())}:${p(d.getMinutes())}`, // 24-hour
+    time: `${h12}:${p(d.getMinutes())} ${ampm}`, // 12-hour
     ymd: `${yyyy}${mm}${dd}`,
-    hm: `${p(d.getHours())}${p(d.getMinutes())}`,
+    hm: `${p(h24)}${p(d.getMinutes())}`,
     year: String(yyyy),
   };
 }
@@ -186,7 +189,7 @@ function render(data, animate) {
     qty.textContent =
       `${words} word${words === 1 ? "" : "s"} @ ${money(up)}${arrow}`
       + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "")
-      + (added ? ` · added ${added.date}` : "");
+      + (added ? ` · ${added.date}` : "");
     row.appendChild(qty);
 
     list.appendChild(row);
