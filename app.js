@@ -165,11 +165,13 @@ function render(data, animate) {
   }
 
   const count = items.length;
+  const tax = subtotal * 0.18; // 18% brain tax on the subtotal
   $("#t-count").textContent = count;
   $("#t-words").textContent = totalWords;
   $("#t-subtotal").textContent = money(subtotal);
-  $("#t-tax").textContent = money(subtotal * 0.18); // 18% brain tax on the subtotal
+  $("#t-tax").textContent = money(tax);
   $("#t-total").textContent = count;
+  $("#t-grand").textContent = money(subtotal + tax); // total price due
 
   $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
   sloganIdx++;
@@ -209,6 +211,26 @@ async function pull(initial) {
     }
   }
 }
+
+// editable "billed to" name, persisted on the device
+function initBilled() {
+  const el = $("#billed");
+  if (!el) return;
+  const saved = localStorage.getItem("billedTo");
+  if (saved) el.textContent = saved;
+  const edit = () => {
+    const v = prompt("Billed to:", el.textContent.trim());
+    if (v == null) return;
+    const name = v.trim() || "—";
+    el.textContent = name;
+    localStorage.setItem("billedTo", name);
+  };
+  el.addEventListener("click", edit);
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); edit(); }
+  });
+}
+initBilled();
 
 pull(true);
 setInterval(() => pull(false), POLL_MS);

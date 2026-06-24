@@ -17,6 +17,7 @@
   <div class="ptr" id="ptr">↓ pull to reprint</div>
   <main class="stage">
     <section class="receipt" id="receipt" aria-label="Idea receipt">
+      <div class="sweep" id="sweep" aria-hidden="true"></div>
       <header class="head">
         <div class="logo">&#128173;</div>
         <h1 class="store" id="store">IDEA RECEIPT CO.</h1>
@@ -41,8 +42,9 @@
         <div class="trow"><span>ITEMS</span><span id="t-count">0</span></div>
         <div class="trow"><span>WORDS</span><span id="t-words">0</span></div>
         <div class="trow"><span>SUBTOTAL</span><span id="t-subtotal">$0.00</span></div>
-        <div class="trow"><span>BRAIN TAX (18%)</span><span id="t-tax">$0.00</span></div>
-        <div class="trow grand"><span>TOTAL IDEAS</span><span id="t-total">0</span></div>
+        <div class="trow tax"><span>BRAIN TAX (18%)</span><span id="t-tax">$0.00</span></div>
+        <div class="trow"><span>TOTAL IDEAS</span><span id="t-total">0</span></div>
+        <div class="trow grand"><span>TOTAL</span><span id="t-grand">$0.00</span></div>
       </div>
 
       <div class="rule"></div>
@@ -55,6 +57,13 @@
       <div class="barcode" id="barcode" aria-hidden="true"></div>
       <div class="barnum" id="barnum">0000 0000 0000</div>
       <div class="barcap" id="barcap"></div>
+
+      <div class="rule"></div>
+      <div class="billed">
+        <span class="billed-label">billed to</span>
+        <span class="billed-name" id="billed" role="button" tabindex="0" title="tap to change">Shaurya</span>
+      </div>
+      <div class="signature">authorised by the dept. of bright ideas</div>
     </section>
 
     <button class="reprint-btn" id="reprint" type="button">↻ reprint receipt</button>
