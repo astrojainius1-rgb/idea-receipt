@@ -1,8 +1,8 @@
 {
   "docTitle": "Ideas",
   "docUrl": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-  "syncedAt": "2026-06-24T18:40:13Z",
-  "count": 1,
+  "syncedAt": "2026-06-24T19:20:26Z",
+  "count": 2,
   "items": [
     {
       "title": "3D Printed Lamps",
@@ -10,6 +10,14 @@
         "Design saved to Insta",
         "Use Transparent PLA for lamp",
         "Use ABS for base"
+      ]
+    },
+    {
+      "title": "Claude Reminder",
+      "details": [
+        "Connects to Whatsapp/Gmail",
+        "Sends message every evening at 10 P.M",
+        "Summary of my schedule for the following day"
       ]
     }
   ]
