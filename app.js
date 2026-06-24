@@ -185,9 +185,9 @@ function render(data, animate) {
 
   if (animate) {
     const r = $("#receipt");
-    r.classList.remove("reprint");
+    r.classList.remove("printing");
     void r.offsetWidth; // restart animation
-    r.classList.add("reprint");
+    r.classList.add("printing");
   }
 }
 
@@ -240,19 +240,83 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") pull(false);
 });
 
+/* ---- printer sound + bing + haptics -------------------------------------- */
+const PRINT_MS = 1300; // keep in sync with the CSS printout animation
+let audioCtx = null;
+function getCtx() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+
+// Buzzy, ratchety dot-matrix-style feed: filtered noise pulsed ~35×/sec.
+function playPrintSound(ms) {
+  const ctx = getCtx();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const dur = ms / 1000;
+  const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 0.7;
+  const gain = ctx.createGain();
+  const step = 0.028;
+  gain.gain.setValueAtTime(0.0001, t0);
+  for (let t = 0; t < dur; t += step) {
+    gain.gain.setValueAtTime(0.13, t0 + t);
+    gain.gain.linearRampToValueAtTime(0.015, t0 + Math.min(dur, t + step * 0.6));
+  }
+  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp).connect(gain).connect(ctx.destination);
+  src.start(t0); src.stop(t0 + dur);
+}
+
+// A clean two-partial bell "bing" for the finished print.
+function playDing() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  [{ f: 1568, g: 0.2 }, { f: 2349, g: 0.09 }].forEach(({ f, g }) => {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const ga = ctx.createGain();
+    ga.gain.setValueAtTime(0.0001, t0);
+    ga.gain.exponentialRampToValueAtTime(g, t0 + 0.01);
+    ga.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+    o.connect(ga).connect(ctx.destination);
+    o.start(t0); o.stop(t0 + 0.95);
+  });
+}
+
+function printFx() {
+  try {
+    playPrintSound(PRINT_MS - 120);
+    if (navigator.vibrate) {
+      const pat = [];
+      for (let i = 0; i < 24; i++) pat.push(24, 22); // ratchety feed (Android; iOS Safari has no vibrate)
+      pat.push(70); // final thunk
+      navigator.vibrate(pat);
+    }
+    setTimeout(() => { playDing(); if (navigator.vibrate) navigator.vibrate(50); }, PRINT_MS - 40);
+  } catch (e) { /* audio/haptics unsupported — ignore */ }
+}
+
 /* ---- manual refresh (home-screen app has no browser reload) --------------- */
 let refreshing = false;
 async function triggerRefresh() {
   if (refreshing) return;
   refreshing = true;
   const btn = $("#reprint");
-  if (btn) { btn.classList.add("busy"); btn.textContent = "↻ reprinting…"; }
-  lastSig = null; // force a re-render (and the reprint animation) even if unchanged
+  if (btn) { btn.classList.add("busy"); btn.textContent = "↻ printing…"; }
+  printFx(); // fires on the user gesture, so audio is allowed to play
+  lastSig = null; // force a re-render (and the print animation) even if unchanged
   await pull(false);
   setTimeout(() => {
     refreshing = false;
     if (btn) { btn.classList.remove("busy"); btn.textContent = "↻ reprint receipt"; }
-  }, 600);
+  }, PRINT_MS);
 }
 $("#reprint")?.addEventListener("click", triggerRefresh);
 

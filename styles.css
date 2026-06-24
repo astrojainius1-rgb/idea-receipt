@@ -157,7 +157,6 @@ body {
 .trow span:last-child { font-variant-numeric: tabular-nums; }
 .trow.tax {
   color: var(--rosso);
-  font-weight: 700;
 }
 .trow.grand {
   font-size: 16px;
@@ -347,16 +346,14 @@ body {
   background-size: 100% 45%;
   background-repeat: no-repeat;
 }
-.receipt.reprint {
-  animation: reprint 680ms cubic-bezier(0.18, 0.9, 0.2, 1);
-  transform-origin: top center;
-}
-.receipt.reprint .sweep { animation: sweep 680ms ease-out; }
+/* the bill prints out top-to-bottom; steps() gives a mechanical line-feed feel */
+.receipt.printing .printroll { animation: printout 1300ms steps(52, end); }
+.receipt.printing .sweep { animation: sweep 1300ms linear; }
+.receipt.printing .item { animation: none; opacity: 1; transform: none; }
 
-@keyframes reprint {
-  0%   { transform: translateY(-22px) scaleY(0.975); opacity: 0.5; }
-  55%  { transform: translateY(3px) scaleY(1.003); opacity: 1; }
-  100% { transform: translateY(0) scaleY(1); }
+@keyframes printout {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0 0); }
 }
 @keyframes sweep {
   0%   { opacity: 0.9; background-position: 0 -45%; }
