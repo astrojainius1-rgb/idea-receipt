@@ -240,12 +240,49 @@ body {
 }
 .notion-btn:active { transform: translateY(1px); }
 
+/* ---- manual refresh ---- */
+.reprint-btn {
+  display: block;
+  width: 100%;
+  margin: 16px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--paper);
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.reprint-btn:active { transform: translateY(1px); }
+.reprint-btn.busy { opacity: 0.6; }
+
+.ptr {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.7);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 5;
+}
+.ptr.ready { color: #fff; }
+
 .hint {
   text-align: center;
   color: rgba(255,255,255,0.45);
   font-size: 10.5px;
   letter-spacing: 0.5px;
-  margin: 16px 0 0;
+  margin: 12px 0 0;
 }
 
 /* flash when a fresh sync brings new content */

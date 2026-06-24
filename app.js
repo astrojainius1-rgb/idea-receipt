@@ -2,7 +2,7 @@
    Every figure on the receipt is derived from the real ideas — see the helpers. */
 
 const POLL_MS = 30000;
-const RATE = 0.10; // $ per word — the receipt "prices" your thinking at 10¢ a word
+const RATE = 0.55; // $ per word — the receipt "prices" your thinking at 55¢ a word
 let lastSig = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -196,3 +196,43 @@ setInterval(() => pull(false), POLL_MS);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") pull(false);
 });
+
+/* ---- manual refresh (home-screen app has no browser reload) --------------- */
+let refreshing = false;
+async function triggerRefresh() {
+  if (refreshing) return;
+  refreshing = true;
+  const btn = $("#reprint");
+  if (btn) { btn.classList.add("busy"); btn.textContent = "↻ reprinting…"; }
+  lastSig = null; // force a re-render (and the reprint animation) even if unchanged
+  await pull(false);
+  setTimeout(() => {
+    refreshing = false;
+    if (btn) { btn.classList.remove("busy"); btn.textContent = "↻ reprint receipt"; }
+  }, 600);
+}
+$("#reprint")?.addEventListener("click", triggerRefresh);
+
+// pull-to-refresh gesture (works in standalone mode where there's no browser UI)
+let ptrStart = null;
+window.addEventListener("touchstart", (e) => {
+  ptrStart = window.scrollY <= 0 ? e.touches[0].clientY : null;
+}, { passive: true });
+window.addEventListener("touchmove", (e) => {
+  if (ptrStart == null) return;
+  const dy = e.touches[0].clientY - ptrStart;
+  const ptr = $("#ptr");
+  if (ptr && dy > 0 && window.scrollY <= 0) {
+    ptr.style.opacity = Math.min(1, dy / 70);
+    ptr.classList.toggle("ready", dy > 70);
+    ptr.textContent = dy > 70 ? "↻ release to reprint" : "↓ pull to reprint";
+  }
+}, { passive: true });
+window.addEventListener("touchend", () => {
+  if (ptrStart == null) return;
+  const ptr = $("#ptr");
+  const ready = ptr && ptr.classList.contains("ready");
+  if (ptr) { ptr.style.opacity = 0; ptr.classList.remove("ready"); }
+  ptrStart = null;
+  if (ready) triggerRefresh();
+}, { passive: true });
