@@ -241,7 +241,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* ---- printer sound + bing + haptics -------------------------------------- */
-const PRINT_MS = 1300; // keep in sync with the CSS printout animation
+const PRINT_MS = 2400; // keep in sync with the CSS printout animation
 let audioCtx = null;
 function getCtx() {
   try {
@@ -251,55 +251,104 @@ function getCtx() {
   } catch (e) { return null; }
 }
 
-// Buzzy, ratchety dot-matrix-style feed: filtered noise pulsed ~35×/sec.
+// A real-printer feel: a wobbling motor hum + ratchety head grains whose timing,
+// loudness and pitch vary, with occasional carriage-return pauses between "lines".
 function playPrintSound(ms) {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
   const dur = ms / 1000;
+
+  // motor hum underneath, speed wobbling slightly
+  const motor = ctx.createOscillator(); motor.type = "sawtooth";
+  const motorGain = ctx.createGain();
+  const motorLp = ctx.createBiquadFilter(); motorLp.type = "lowpass"; motorLp.frequency.value = 240;
+  motorGain.gain.setValueAtTime(0.0001, t0);
+  motorGain.gain.linearRampToValueAtTime(0.035, t0 + 0.1);
+  let mt = 0;
+  while (mt < dur) {
+    motor.frequency.setValueAtTime(50 + Math.random() * 16, t0 + mt);
+    mt += 0.07 + Math.random() * 0.07;
+  }
+  motorGain.gain.setValueAtTime(0.035, t0 + Math.max(0, dur - 0.12));
+  motorGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  motor.connect(motorLp).connect(motorGain).connect(ctx.destination);
+  motor.start(t0); motor.stop(t0 + dur);
+
+  // ratchety print head: bursts of filtered noise, jittered in time/level/pitch
   const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
   const ch = buf.getChannelData(0);
   for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
   const src = ctx.createBufferSource(); src.buffer = buf;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1500; bp.Q.value = 0.7;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
   const gain = ctx.createGain();
-  const step = 0.028;
   gain.gain.setValueAtTime(0.0001, t0);
-  for (let t = 0; t < dur; t += step) {
-    gain.gain.setValueAtTime(0.13, t0 + t);
-    gain.gain.linearRampToValueAtTime(0.015, t0 + Math.min(dur, t + step * 0.6));
+
+  let t = 0, line = 0;
+  const lineLen = 7 + Math.floor(Math.random() * 7);
+  while (t < dur) {
+    const onset = t0 + t;
+    const len = 0.016 + Math.random() * 0.03;     // burst length varies
+    const amp = 0.05 + Math.random() * 0.13;       // loudness varies
+    gain.gain.setValueAtTime(amp, onset);
+    gain.gain.exponentialRampToValueAtTime(0.008, onset + len * 0.75);
+    bp.frequency.setValueAtTime(850 + Math.random() * 2300, onset); // pitch/timbre varies
+    t += len + 0.004 + Math.random() * 0.01;
+    if (++line % lineLen === 0) t += 0.07 + Math.random() * 0.1;     // carriage-return pause
   }
   gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
   src.connect(bp).connect(gain).connect(ctx.destination);
   src.start(t0); src.stop(t0 + dur);
 }
 
-// A clean two-partial bell "bing" for the finished print.
+// A struck desk/service bell: bright metallic strike + inharmonic partials that ring out.
 function playDing() {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
-  [{ f: 1568, g: 0.2 }, { f: 2349, g: 0.09 }].forEach(({ f, g }) => {
-    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f;
+  const f0 = 1280;
+  // classic inharmonic bell ratios — gives the metallic "ting" rather than a pure tone
+  [
+    { r: 1.00, g: 0.24, d: 1.8 },
+    { r: 2.76, g: 0.13, d: 1.4 },
+    { r: 5.40, g: 0.08, d: 1.0 },
+    { r: 8.93, g: 0.05, d: 0.7 },
+  ].forEach(({ r, g, d }) => {
+    const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = f0 * r;
     const ga = ctx.createGain();
     ga.gain.setValueAtTime(0.0001, t0);
-    ga.gain.exponentialRampToValueAtTime(g, t0 + 0.01);
-    ga.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.9);
+    ga.gain.exponentialRampToValueAtTime(g, t0 + 0.003); // sharp strike attack
+    ga.gain.exponentialRampToValueAtTime(0.0001, t0 + d); // long ring-out
     o.connect(ga).connect(ctx.destination);
-    o.start(t0); o.stop(t0 + 0.95);
+    o.start(t0); o.stop(t0 + d + 0.05);
   });
+  // the metallic "clink" of the hammer hitting the dome
+  const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.04), ctx.sampleRate);
+  const nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = (Math.random() * 2 - 1) * (1 - i / nd.length);
+  const ns = ctx.createBufferSource(); ns.buffer = nb;
+  const nf = ctx.createBiquadFilter(); nf.type = "highpass"; nf.frequency.value = 3200;
+  const ng = ctx.createGain(); ng.gain.value = 0.18;
+  ns.connect(nf).connect(ng).connect(ctx.destination);
+  ns.start(t0); ns.stop(t0 + 0.04);
 }
 
 function printFx() {
   try {
-    playPrintSound(PRINT_MS - 120);
+    playPrintSound(PRINT_MS - 140);
     if (navigator.vibrate) {
       const pat = [];
-      for (let i = 0; i < 24; i++) pat.push(24, 22); // ratchety feed (Android; iOS Safari has no vibrate)
-      pat.push(70); // final thunk
+      let total = 0;
+      while (total < PRINT_MS - 140) { // ratchety feed, varied (Android; iOS Safari has no vibrate)
+        const on = 16 + Math.floor(Math.random() * 16);
+        const off = 14 + Math.floor(Math.random() * 20);
+        pat.push(on, off);
+        total += on + off;
+      }
+      pat.push(90); // final thunk
       navigator.vibrate(pat);
     }
-    setTimeout(() => { playDing(); if (navigator.vibrate) navigator.vibrate(50); }, PRINT_MS - 40);
+    setTimeout(() => { playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS - 40);
   } catch (e) { /* audio/haptics unsupported — ignore */ }
 }
 

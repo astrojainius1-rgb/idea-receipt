@@ -347,8 +347,8 @@ body {
   background-repeat: no-repeat;
 }
 /* the bill prints out top-to-bottom; steps() gives a mechanical line-feed feel */
-.receipt.printing .printroll { animation: printout 1300ms steps(52, end); }
-.receipt.printing .sweep { animation: sweep 1300ms linear; }
+.receipt.printing .printroll { animation: printout 2400ms steps(80, end); }
+.receipt.printing .sweep { animation: sweep 2400ms linear; }
 .receipt.printing .item { animation: none; opacity: 1; transform: none; }
 
 @keyframes printout {
