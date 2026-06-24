@@ -133,9 +133,9 @@ function render(data, animate) {
   const when = stamp(data.syncedAt);
 
   $("#store").textContent = (data.docTitle || "IDEA RECEIPT CO.").toUpperCase();
-  $("#tagline").textContent = `est. ${when.year} — ideas, freshly printed`;
+  $("#tagline").textContent = `est. ${when.year}`;
   $("#synced").textContent = `${when.date} ${when.time}`.trim();
-  $("#order").textContent = `ORDER #${when.ymd}-${when.hm}`;
+  $("#order").textContent = `ORDER #${when.ymd.slice(4)}-${when.hm}`;
   lastSyncIso = data.syncedAt;
   updateSyncedAgo();
 
