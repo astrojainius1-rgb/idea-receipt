@@ -1,70 +1,101 @@
-/* Idea Receipt — renders data.json as a shop receipt and polls for changes. */
+/* Idea Receipt — renders data.json as a shop receipt and polls for changes.
+   Every figure on the receipt is derived from the real ideas — see the helpers. */
 
 const POLL_MS = 30000;
+const RATE = 0.10; // $ per word — the receipt "prices" your thinking at 10¢ a word
 let lastSig = null;
 
 const $ = (sel) => document.querySelector(sel);
-
-function hashStr(s) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function priceFor(seed) {
-  const cents = 100 + (hashStr("$" + seed) % 900); // $1.00 .. $9.99
-  return cents / 100;
-}
-
 const money = (n) => "$" + n.toFixed(2);
 
-function fmtWhen(iso) {
-  const d = iso ? new Date(iso) : new Date();
-  if (isNaN(d)) return "--";
-  const date = d.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  return `${date} ${time}`;
+/* ---- real metrics -------------------------------------------------------- */
+const wordsIn = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
+function ideaWords(it) {
+  const details = Array.isArray(it.details) ? it.details : [];
+  return wordsIn(it.title) + details.reduce((n, d) => n + wordsIn(d), 0);
 }
 
-function buildBarcode(seed) {
+function stamp(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  if (isNaN(d)) return { date: "--", time: "", ymd: "00000000", hm: "0000", year: "----" };
+  return {
+    date: d.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" }),
+    time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+    ymd: `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`,
+    hm: `${p(d.getHours())}${p(d.getMinutes())}`,
+    year: String(d.getFullYear()),
+  };
+}
+
+// Luhn check digit, so the printed serial is *valid* like a real product barcode.
+function luhn(num) {
+  let sum = 0, alt = false;
+  for (let i = num.length - 1; i >= 0; i--) {
+    let n = +num[i];
+    if (alt) { n *= 2; if (n > 9) n -= 9; }
+    sum += n; alt = !alt;
+  }
+  return String((10 - (sum % 10)) % 10);
+}
+
+// Serial encodes: print date (YYYYMMDD) · idea count (2) · word count (4) · check digit.
+function serial(ymd, items, words) {
+  const base = ymd
+    + String(Math.min(items, 99)).padStart(2, "0")
+    + String(Math.min(words, 9999)).padStart(4, "0");
+  return base + luhn(base);
+}
+const group4 = (s) => s.replace(/(.{4})/g, "$1 ").trim();
+
+/* ---- the scannable QR (real, encodes the Notion page URL) ----------------- */
+function buildCode(url) {
   const el = $("#barcode");
   el.innerHTML = "";
-  let h = hashStr(seed || "ideas");
-  // deterministic pseudo-random bar widths from the hash
-  for (let i = 0; i < 44; i++) {
-    h = (Math.imul(h, 1103515245) + 12345) >>> 0;
-    const w = 1 + (h % 4); // 1..4 px
-    const bar = document.createElement("i");
-    bar.style.width = w + "px";
-    bar.style.opacity = (h & 1) ? "1" : "0.16"; // gaps as faint bars keep spacing even
-    el.appendChild(bar);
+  try {
+    if (typeof qrcode !== "function" || !url) throw new Error("qr unavailable");
+    const qr = qrcode(0, "M"); // type 0 = auto-size, error-correction M
+    qr.addData(url);
+    qr.make();
+    el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+    el.classList.add("qr");
+    return;
+  } catch (e) {
+    // Fallback: deterministic bars derived from the same url (no library available).
+    el.classList.remove("qr");
+    let h = 2166136261;
+    const seed = url || "ideas";
+    for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+    for (let i = 0; i < 44; i++) {
+      h = (Math.imul(h, 1103515245) + 12345) >>> 0;
+      const bar = document.createElement("i");
+      bar.style.width = (1 + (h % 4)) + "px";
+      bar.style.opacity = (h & 1) ? "1" : "0.16";
+      el.appendChild(bar);
+    }
   }
-}
-
-function digitsFrom(seed) {
-  const h = hashStr("#" + (seed || "ideas")).toString().padStart(10, "0").slice(0, 12).padEnd(12, "0");
-  return `${h.slice(0, 4)} ${h.slice(4, 8)} ${h.slice(8, 12)}`;
 }
 
 function render(data, animate) {
   const items = Array.isArray(data.items) ? data.items : [];
+  const when = stamp(data.syncedAt);
 
   $("#store").textContent = (data.docTitle || "IDEA RECEIPT CO.").toUpperCase();
-  $("#synced").textContent = fmtWhen(data.syncedAt);
-  $("#order").textContent = "ORDER #" + String(hashStr(data.syncedAt || "") % 10000).padStart(4, "0");
+  $("#tagline").textContent = `est. ${when.year} — ideas, freshly printed`;
+  $("#synced").textContent = `${when.date} ${when.time}`.trim();
+  $("#order").textContent = `ORDER #${when.ymd}-${when.hm}`;
 
   const list = $("#items");
   list.innerHTML = "";
-  let subtotal = 0;
+  let subtotal = 0, totalWords = 0;
 
   items.forEach((it, i) => {
     const title = (it.title || "Untitled idea").trim();
     const details = Array.isArray(it.details) ? it.details : [];
-    const p = priceFor(title);
-    subtotal += p;
+    const words = ideaWords(it);
+    const amt = words * RATE; // price = the words you spent on the idea
+    subtotal += amt;
+    totalWords += words;
 
     const row = document.createElement("div");
     row.className = "item";
@@ -77,10 +108,10 @@ function render(data, animate) {
     name.textContent = title;
     const dots = document.createElement("span");
     dots.className = "dots";
-    const amt = document.createElement("span");
-    amt.className = "amt";
-    amt.textContent = money(p);
-    line.append(name, dots, amt);
+    const amtEl = document.createElement("span");
+    amtEl.className = "amt";
+    amtEl.textContent = money(amt);
+    line.append(name, dots, amtEl);
     row.appendChild(line);
 
     if (details.length) {
@@ -95,9 +126,12 @@ function render(data, animate) {
       row.appendChild(det);
     }
 
+    const pts = details.length;
     const qty = document.createElement("div");
     qty.className = "qty";
-    qty.textContent = `qty ${Math.max(1, details.length)} @ ${money(p)}`;
+    qty.textContent =
+      `${words} word${words === 1 ? "" : "s"} @ ${money(RATE)}`
+      + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "");
     row.appendChild(qty);
 
     list.appendChild(row);
@@ -111,13 +145,18 @@ function render(data, animate) {
     list.appendChild(empty);
   }
 
-  const count = (data.count != null) ? data.count : items.length;
+  const count = items.length;
   $("#t-count").textContent = count;
+  $("#t-words").textContent = totalWords;
   $("#t-subtotal").textContent = money(subtotal);
   $("#t-total").textContent = count;
 
-  buildBarcode(data.docTitle);
-  $("#barnum").textContent = digitsFrom(data.docTitle);
+  const url = data.docUrl || location.href;
+  buildCode(url);
+  $("#barnum").textContent = group4(serial(when.ymd, count, totalWords));
+  let host = "this receipt";
+  try { host = new URL(url).host.replace(/^www\./, ""); } catch (e) {}
+  $("#barcap").textContent = `scan → ${host}`;
 
   if (animate) {
     const r = $("#receipt");
@@ -137,7 +176,6 @@ async function pull(initial) {
     lastSig = sig;
     render(data, !initial); // animate only on later refreshes; initial uses the CSS feed-in
     if (initial) {
-      // initial render still wants the staggered feed-in
       $("#items").querySelectorAll(".item").forEach((el, i) => el.style.setProperty("--i", i));
     }
   } catch (err) {

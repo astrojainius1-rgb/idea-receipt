@@ -19,7 +19,7 @@
       <header class="head">
         <div class="logo">&#128173;</div>
         <h1 class="store" id="store">IDEA RECEIPT CO.</h1>
-        <div class="tagline">est. whenever &mdash; ideas, freshly printed</div>
+        <div class="tagline" id="tagline">est. whenever &mdash; ideas, freshly printed</div>
         <div class="meta">
           <span id="order">ORDER #0000</span>
           <span id="synced">--</span>
@@ -38,8 +38,8 @@
 
       <div class="totals">
         <div class="trow"><span>ITEMS</span><span id="t-count">0</span></div>
+        <div class="trow"><span>WORDS</span><span id="t-words">0</span></div>
         <div class="trow"><span>SUBTOTAL</span><span id="t-subtotal">$0.00</span></div>
-        <div class="trow"><span>BRAIN TAX (0%)</span><span>$0.00</span></div>
         <div class="trow grand"><span>TOTAL IDEAS</span><span id="t-total">0</span></div>
       </div>
 
@@ -50,11 +50,13 @@
 
       <div class="barcode" id="barcode" aria-hidden="true"></div>
       <div class="barnum" id="barnum">0000 0000 0000</div>
+      <div class="barcap" id="barcap"></div>
     </section>
 
     <p class="hint" id="hint">auto-syncs from your Notion ideas &middot; pull to refresh anytime</p>
   </main>
 
+  <script src="vendor/qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
