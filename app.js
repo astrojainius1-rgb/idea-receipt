@@ -58,6 +58,7 @@ function buildCode(url) {
     qr.addData(url);
     qr.make();
     el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+    el.querySelector("svg rect")?.remove(); // drop the white background — sit on the paper
     el.classList.add("qr");
     return;
   } catch (e) {
@@ -149,6 +150,7 @@ function render(data, animate) {
   $("#t-count").textContent = count;
   $("#t-words").textContent = totalWords;
   $("#t-subtotal").textContent = money(subtotal);
+  $("#t-tax").textContent = money(subtotal * 0.18); // 18% brain tax on the subtotal
   $("#t-total").textContent = count;
 
   const url = data.docUrl || location.href;
