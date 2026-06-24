@@ -91,7 +91,10 @@ def build_items():
         t = b.get("type", "")
         if t.startswith("heading_"):
             title = plain_text(b[t].get("rich_text")).rstrip(":").strip()
-            current = {"title": title or "Untitled idea", "details": []}
+            if not title:
+                current = None  # skip empty/placeholder headings
+                continue
+            current = {"title": title, "details": []}
             items.append(current)
             # toggle headings nest their bullets as children
             if b.get("has_children"):
