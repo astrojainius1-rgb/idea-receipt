@@ -19,14 +19,32 @@ function stamp(iso) {
   const d = iso ? new Date(iso) : new Date();
   const p = (n) => String(n).padStart(2, "0");
   if (isNaN(d)) return { date: "--", time: "", ymd: "00000000", hm: "0000", year: "----" };
+  const dd = p(d.getDate()), mm = p(d.getMonth() + 1), yyyy = d.getFullYear();
   return {
-    date: d.toLocaleDateString(undefined, { month: "short", day: "2-digit", year: "numeric" }),
-    time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
-    ymd: `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`,
+    date: `${dd}/${mm}/${yyyy}`,                 // dd/mm/yyyy
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`, // 24-hour
+    ymd: `${yyyy}${mm}${dd}`,
     hm: `${p(d.getHours())}${p(d.getMinutes())}`,
-    year: String(d.getFullYear()),
+    year: String(yyyy),
   };
 }
+
+// Rotating receipt slogans — a different one prints above the QR on every refresh.
+const SLOGANS = [
+  "thank you for thinking with us",
+  "no refunds on big ideas",
+  "today's special: your imagination",
+  "ideas keep better when written down",
+  "served fresh — zero preservatives",
+  "every idea counts, literally",
+  "warning: contents may inspire",
+  "you're on a roll — keep going",
+  "this receipt self-improves",
+  "scan below to visit the source",
+  "have a brilliant day",
+  "come back with more ideas",
+];
+let sloganIdx = 0;
 
 // Luhn check digit, so the printed serial is *valid* like a real product barcode.
 function luhn(num) {
@@ -152,6 +170,9 @@ function render(data, animate) {
   $("#t-subtotal").textContent = money(subtotal);
   $("#t-tax").textContent = money(subtotal * 0.18); // 18% brain tax on the subtotal
   $("#t-total").textContent = count;
+
+  $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
+  sloganIdx++;
 
   const url = data.docUrl || location.href;
   buildCode(url);

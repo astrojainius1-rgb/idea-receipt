@@ -2,7 +2,7 @@ name: Sync ideas from Notion
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every ~15 min (GitHub may delay scheduled runs)
+    - cron: "* * * * *"      # every minute (GitHub's effective floor is ~5 min and runs may be delayed)
   workflow_dispatch:          # lets you run it on demand from the Actions tab
 
 permissions:
