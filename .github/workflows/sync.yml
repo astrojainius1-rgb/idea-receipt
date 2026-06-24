@@ -2,7 +2,7 @@ name: Sync ideas from Notion
 
 on:
   schedule:
-    - cron: "* * * * *"      # every minute (GitHub's effective floor is ~5 min and runs may be delayed)
+    - cron: "*/10 * * * *"   # every 10 min — matches GitHub's real throttle floor; the page also polls client-side
   workflow_dispatch:          # lets you run it on demand from the Actions tab
 
 permissions:

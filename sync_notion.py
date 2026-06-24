@@ -94,7 +94,7 @@ def build_items():
             if not title:
                 current = None  # skip empty/placeholder headings
                 continue
-            current = {"title": title, "details": []}
+            current = {"title": title, "details": [], "added": b.get("created_time")}
             items.append(current)
             # toggle headings nest their bullets as children
             if b.get("has_children"):

@@ -2,11 +2,41 @@
    Every figure on the receipt is derived from the real ideas — see the helpers. */
 
 const POLL_MS = 30000;
-const RATE = 0.55; // $ per word — the receipt "prices" your thinking at 55¢ a word
+const RATE = 0.55; // base $/word — the "list price"; each idea trades a bit above/below it
+const STALE_MIN = 90; // minutes before the "synced" stamp goes amber (cron runs every 10 min)
 let lastSig = null;
+let lastSyncIso = null;
 
 const $ = (sel) => document.querySelector(sel);
 const money = (n) => "$" + n.toFixed(2);
+
+// stable 32-bit hash of a string (FNV-1a) — same idea always gets the same number
+function hash32(s) {
+  let h = 2166136261;
+  s = String(s);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+// "market price" per word: every idea trades at a stable price seeded by its title,
+// ranging 0.38–0.92 around the 0.55 list rate — so totals stop looking uniform.
+function unitPrice(title) {
+  const f = hash32(title) / 4294967295; // 0..1
+  return Math.round((0.38 + f * 0.54) * 100) / 100;
+}
+
+// human "x ago" for the synced stamp
+function agoText(iso) {
+  const t = Date.parse(iso || "");
+  if (isNaN(t)) return { text: "synced --", stale: false };
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  let text;
+  if (mins < 1) text = "synced just now";
+  else if (mins < 60) text = `synced ${mins} min ago`;
+  else if (mins < 1440) text = `synced ${Math.round(mins / 60)}h ago`;
+  else text = `synced ${Math.round(mins / 1440)}d ago`;
+  return { text, stale: mins >= STALE_MIN };
+}
 
 /* ---- real metrics -------------------------------------------------------- */
 const wordsIn = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
@@ -103,6 +133,8 @@ function render(data, animate) {
   $("#tagline").textContent = `est. ${when.year} — ideas, freshly printed`;
   $("#synced").textContent = `${when.date} ${when.time}`.trim();
   $("#order").textContent = `ORDER #${when.ymd}-${when.hm}`;
+  lastSyncIso = data.syncedAt;
+  updateSyncedAgo();
 
   const list = $("#items");
   list.innerHTML = "";
@@ -112,7 +144,8 @@ function render(data, animate) {
     const title = (it.title || "Untitled idea").trim();
     const details = Array.isArray(it.details) ? it.details : [];
     const words = ideaWords(it);
-    const amt = words * RATE; // price = the words you spent on the idea
+    const up = unitPrice(title);          // this idea's market rate per word
+    const amt = words * up;               // price = words × this idea's going rate
     subtotal += amt;
     totalWords += words;
 
@@ -146,11 +179,14 @@ function render(data, animate) {
     }
 
     const pts = details.length;
+    const arrow = up > RATE ? " ▲" : up < RATE ? " ▼" : "";
+    const added = it.added ? stamp(it.added) : null;
     const qty = document.createElement("div");
     qty.className = "qty";
     qty.textContent =
-      `${words} word${words === 1 ? "" : "s"} @ ${money(RATE)}`
-      + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "");
+      `${words} word${words === 1 ? "" : "s"} @ ${money(up)}${arrow}`
+      + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "")
+      + (added ? ` · added ${added.date}` : "");
     row.appendChild(qty);
 
     list.appendChild(row);
@@ -175,6 +211,11 @@ function render(data, animate) {
 
   $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
   sloganIdx++;
+
+  // lifetime tally of ideas printed on this device (every print adds the current batch)
+  const printed = (parseInt(localStorage.getItem("lifetimePrinted") || "0", 10) || 0) + count;
+  localStorage.setItem("lifetimePrinted", String(printed));
+  $("#lifetime").textContent = `${printed} idea${printed === 1 ? "" : "s"} printed here, all-time`;
 
   const url = data.docUrl || location.href;
   buildCode(url);
@@ -231,6 +272,96 @@ function initBilled() {
   });
 }
 initBilled();
+
+// keep the "synced x ago" line live (and amber once stale) without refetching
+function updateSyncedAgo() {
+  const el = $("#syncedAgo");
+  if (!el) return;
+  const { text, stale } = agoText(lastSyncIso);
+  el.textContent = text;
+  el.classList.toggle("stale", stale);
+}
+setInterval(updateSyncedAgo, 30000);
+
+/* ---- save the receipt as a PNG image ------------------------------------- */
+// Rasterise the receipt by inlining computed styles into an SVG <foreignObject>.
+// No external libraries, no cross-origin assets, so the canvas stays untainted.
+function inlineStyles(src, dst) {
+  const cs = getComputedStyle(src);
+  let str = "";
+  for (let i = 0; i < cs.length; i++) {
+    const p = cs[i];
+    str += `${p}:${cs.getPropertyValue(p)};`;
+  }
+  dst.setAttribute("style", str);
+  const sc = src.children, dc = dst.children;
+  for (let i = 0; i < sc.length; i++) inlineStyles(sc[i], dc[i]);
+}
+
+async function saveImage() {
+  const btn = $("#save");
+  const src = $("#receipt");
+  if (!src) return;
+  try {
+    if (btn) { btn.classList.add("busy"); btn.textContent = "rendering…"; }
+    const rect = src.getBoundingClientRect();
+    const w = Math.ceil(rect.width), h = Math.ceil(rect.height);
+
+    const clone = src.cloneNode(true);
+    // inline styles first — it walks src and clone in lockstep, so the trees must
+    // still be structurally identical at this point.
+    inlineStyles(src, clone);
+    clone.querySelector("#sweep")?.remove();        // drop the animation overlay
+    clone.classList.remove("printing");
+    clone.querySelectorAll(".detail").forEach((d) => { d.textContent = "+ " + d.textContent; });
+    clone.style.margin = "0";
+
+    const xml = new XMLSerializer().serializeToString(clone);
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+      `<foreignObject width="100%" height="100%">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml">${xml}</div>` +
+      `</foreignObject></svg>`;
+
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = w * scale; canvas.height = h * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => { ctx.drawImage(img, 0, 0); resolve(); };
+      img.onerror = reject;
+      img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    });
+
+    const fname = `idea-receipt-${stamp().ymd}.png`;
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+    // prefer the native share sheet on phones, fall back to a download
+    if (blob && navigator.canShare && navigator.canShare({ files: [new File([blob], fname, { type: "image/png" })] })) {
+      await navigator.share({ files: [new File([blob], fname, { type: "image/png" })], title: "Idea Receipt" });
+    } else {
+      const a = document.createElement("a");
+      a.href = blob ? URL.createObjectURL(blob) : canvas.toDataURL("image/png");
+      a.download = fname;
+      a.click();
+      if (blob) setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }
+  } catch (e) {
+    console.error("save failed", e);
+    if (btn) btn.textContent = "save failed";
+    setTimeout(() => { if (btn) btn.textContent = "⬇ save image"; }, 1500);
+    return;
+  }
+  if (btn) { btn.classList.remove("busy"); btn.textContent = "⬇ save image"; }
+}
+$("#save")?.addEventListener("click", saveImage);
+
+// offline support: cache the shell + last ideas
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
 
 pull(true);
 setInterval(() => pull(false), POLL_MS);

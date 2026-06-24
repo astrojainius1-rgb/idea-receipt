@@ -7,6 +7,7 @@
   --ink-soft: #5c6066;
   --accent: #c0392b;
   --rosso: #d40000; /* rosso corsa */
+  --amber: #b9791b;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Courier New", monospace;
 }
 
@@ -58,6 +59,29 @@ body {
 }
 .receipt::before { top: -11px; transform: scaleY(-1); }
 .receipt::after  { bottom: -11px; }
+
+/* ---- synced-ago (top-left, above the title) ---- */
+.synced-bar {
+  text-align: left;
+  margin-bottom: 6px;
+}
+.synced-ago {
+  font-size: 9.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.synced-ago::before {
+  content: "";
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #3a9d5d;          /* green = fresh */
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.synced-ago.stale { color: var(--amber); }
+.synced-ago.stale::before { background: var(--amber); }
 
 /* ---- header ---- */
 .head { text-align: center; }
@@ -186,6 +210,15 @@ body {
   color: var(--ink-soft);
   margin-top: 2px;
 }
+.lifetime {
+  text-align: center;
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  opacity: 0.85;
+  margin-top: 6px;
+}
 
 /* ---- rotating slogan above the code ---- */
 .slogan {
@@ -291,6 +324,12 @@ body {
 .notion-btn:active { transform: translateY(1px); }
 
 /* ---- manual refresh ---- */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+.actions .reprint-btn { margin: 0; flex: 1 1 0; }
 .reprint-btn {
   display: block;
   width: 100%;
