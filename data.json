@@ -1,0 +1,23 @@
+{
+  "docTitle": "Ideas",
+  "docUrl": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
+  "syncedAt": "2026-06-24T15:20:00Z",
+  "count": 2,
+  "items": [
+    {
+      "title": "Welcome",
+      "details": [
+        "This is an example idea — delete it whenever",
+        "Add a new heading for each new idea",
+        "Then say \"sync my ideas\" to print them onto the receipt"
+      ]
+    },
+    {
+      "title": "Receipt page is live",
+      "details": [
+        "Open the GitHub Pages link on your phone",
+        "Add it to your home screen so it opens full-screen"
+      ]
+    }
+  ]
+}

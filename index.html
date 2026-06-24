@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Idea Receipt</title>
+  <meta name="theme-color" content="#15171c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Ideas" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="stage">
+    <section class="receipt" id="receipt" aria-label="Idea receipt">
+      <header class="head">
+        <div class="logo">&#128173;</div>
+        <h1 class="store" id="store">IDEA RECEIPT CO.</h1>
+        <div class="tagline">est. whenever &mdash; ideas, freshly printed</div>
+        <div class="meta">
+          <span id="order">ORDER #0000</span>
+          <span id="synced">--</span>
+        </div>
+      </header>
+
+      <div class="rule"></div>
+      <div class="col-head">
+        <span>ITEM</span><span>AMT</span>
+      </div>
+      <div class="rule"></div>
+
+      <div class="items" id="items"><!-- rendered by app.js --></div>
+
+      <div class="rule"></div>
+
+      <div class="totals">
+        <div class="trow"><span>ITEMS</span><span id="t-count">0</span></div>
+        <div class="trow"><span>SUBTOTAL</span><span id="t-subtotal">$0.00</span></div>
+        <div class="trow"><span>BRAIN TAX (0%)</span><span>$0.00</span></div>
+        <div class="trow grand"><span>TOTAL IDEAS</span><span id="t-total">0</span></div>
+      </div>
+
+      <div class="rule"></div>
+      <div class="paid">* * *  PAID IN FULL  &mdash;  CURIOSITY  * * *</div>
+      <div class="thanks">THANK YOU FOR YOUR IDEAS!</div>
+      <div class="thanks small">keep thinking &mdash; come again</div>
+
+      <div class="barcode" id="barcode" aria-hidden="true"></div>
+      <div class="barnum" id="barnum">0000 0000 0000</div>
+    </section>
+
+    <p class="hint" id="hint">printed from your Notion ideas &middot; pull to refresh anytime</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

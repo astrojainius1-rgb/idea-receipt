@@ -1,0 +1,242 @@
+:root {
+  --bg: #2a2d34;
+  --bg2: #1b1d22;
+  --paper: #f7f5ee;
+  --paper-shade: #ece8da;
+  --ink: #20242b;
+  --ink-soft: #5c6066;
+  --accent: #c0392b;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Courier New", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--mono);
+  background: radial-gradient(120% 80% at 50% 0%, var(--bg) 0%, var(--bg2) 75%);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  padding: 28px 16px calc(40px + env(safe-area-inset-bottom));
+}
+
+.stage {
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+/* ---- paper ---- */
+.receipt {
+  position: relative;
+  background: var(--paper);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.014) 0 2px, transparent 2px 4px);
+  color: var(--ink);
+  padding: 26px 22px 30px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.3);
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+/* torn zig-zag edges, top + bottom */
+.receipt::before,
+.receipt::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background:
+    linear-gradient(45deg, var(--paper) 50%, transparent 50%) 0 0 / 16px 12px repeat-x,
+    linear-gradient(-45deg, var(--paper) 50%, transparent 50%) 0 0 / 16px 12px repeat-x;
+}
+.receipt::before { top: -11px; transform: scaleY(-1); }
+.receipt::after  { bottom: -11px; }
+
+/* ---- header ---- */
+.head { text-align: center; }
+.logo { font-size: 30px; line-height: 1; margin-bottom: 4px; }
+.store {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.tagline {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  letter-spacing: 0.4px;
+}
+.meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--ink-soft);
+  margin-top: 12px;
+  letter-spacing: 0.4px;
+}
+
+/* ---- rules / columns ---- */
+.rule {
+  border-top: 1.5px dashed var(--ink);
+  opacity: 0.55;
+  margin: 12px 0;
+}
+.col-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  color: var(--ink-soft);
+}
+
+/* ---- items ---- */
+.items { display: block; }
+.item {
+  margin: 9px 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  animation: feed 360ms ease-out forwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+}
+.item-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.item-line .name { white-space: normal; text-transform: uppercase; }
+.item-line .dots {
+  flex: 1 1 auto;
+  min-width: 10px;
+  border-bottom: 1.5px dotted var(--ink-soft);
+  transform: translateY(-4px);
+}
+.item-line .amt { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.details { margin: 2px 0 0 10px; }
+.detail {
+  display: flex;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+.detail::before {
+  content: "+";
+  margin-right: 6px;
+  opacity: 0.7;
+}
+.qty {
+  font-size: 10px;
+  color: var(--ink-soft);
+  margin: 1px 0 0 10px;
+  letter-spacing: 0.5px;
+}
+
+@keyframes feed {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- totals ---- */
+.totals { font-size: 12.5px; }
+.trow {
+  display: flex;
+  justify-content: space-between;
+  letter-spacing: 0.5px;
+  margin: 3px 0;
+}
+.trow span:last-child { font-variant-numeric: tabular-nums; }
+.trow.grand {
+  font-size: 16px;
+  font-weight: 800;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid var(--ink);
+}
+
+/* ---- footer ---- */
+.paid {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin: 4px 0 10px;
+}
+.thanks {
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.thanks.small {
+  font-weight: 400;
+  font-size: 10.5px;
+  text-transform: none;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* ---- barcode ---- */
+.barcode {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 1px;
+  height: 56px;
+  margin: 16px 0 6px;
+}
+.barcode i {
+  display: block;
+  background: var(--ink);
+  height: 100%;
+}
+.barnum {
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 5px;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+
+/* ---- notion button ---- */
+.notion-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-size: 12.5px;
+  color: var(--paper);
+  background: var(--ink);
+  border: 2px solid var(--ink);
+  padding: 11px 12px;
+  border-radius: 2px;
+}
+.notion-btn:active { transform: translateY(1px); }
+
+.hint {
+  text-align: center;
+  color: rgba(255,255,255,0.45);
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  margin: 16px 0 0;
+}
+
+/* flash when a fresh sync brings new content */
+.receipt.reprint { animation: reprint 500ms ease; }
+@keyframes reprint {
+  0% { transform: translateY(-10px); }
+  100% { transform: translateY(0); }
+}
+
+@media (prefers-color-scheme: light) {
+  body { background: radial-gradient(120% 80% at 50% 0%, #5a5e66 0%, #34373d 75%); }
+}
