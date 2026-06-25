@@ -100,6 +100,18 @@ body {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.brand-mark {
+  width: 26px;
+  height: 26px;
+  color: var(--ink);
+  flex: none;
+}
 .tagline {
   font-size: 10.5px;
   color: var(--ink-soft);
