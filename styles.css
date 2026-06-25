@@ -191,10 +191,12 @@ body {
 
 /* tap an idea to cross it off (persisted locally) */
 .item { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.item.done .item-line { text-decoration: line-through; text-decoration-thickness: 1.5px; opacity: 0.5; }
+.item.done .item-line { opacity: 0.5; }
+.item.done .item-line .name,
+.item.done .item-line .amt { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.item.done .new-stamp { text-decoration: none; } /* the NEW stamp is never struck through */
 .item.done .details,
 .item.done .qty { opacity: 0.4; }
-.item.done .item-line .amt { text-decoration: line-through; }
 /* an idea just added from the page, awaiting the next Notion sync */
 .item.pending { opacity: 0.7; }
 .item.pending .item-line .amt { font-style: italic; }

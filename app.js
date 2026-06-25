@@ -970,34 +970,43 @@ function playDing() {
   ns.start(t0); ns.stop(t0 + 0.04);
 }
 
-// the guillotine cutter: a quick blade "shik" swept down, then a low chassis thunk
+// a real scissor/cutter snip: two fast blade "shk" transients, then a tiny metallic ring
+// as the blades meet — crisp and short, not a clunk.
 function playSnip() {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
-  const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.09), ctx.sampleRate);
-  const nd = nb.getChannelData(0);
-  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  const ns = ctx.createBufferSource(); ns.buffer = nb;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.1;
-  bp.frequency.setValueAtTime(5200, t0);
-  bp.frequency.exponentialRampToValueAtTime(1300, t0 + 0.07);
-  const ng = ctx.createGain();
-  ng.gain.setValueAtTime(0.0001, t0);
-  ng.gain.exponentialRampToValueAtTime(0.5, t0 + 0.004);
-  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.085);
-  ns.connect(bp).connect(ng).connect(ctx.destination);
-  ns.start(t0); ns.stop(t0 + 0.09);
 
-  const o = ctx.createOscillator(); o.type = "triangle";
-  o.frequency.setValueAtTime(180, t0 + 0.05);
-  o.frequency.exponentialRampToValueAtTime(70, t0 + 0.17);
+  // one short, sharp blade swipe (steeply-decaying bright noise)
+  function blade(at, freq, level) {
+    const len = 0.032;
+    const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * len), ctx.sampleRate);
+    const nd = nb.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) {
+      const k = 1 - i / nd.length;
+      nd[i] = (Math.random() * 2 - 1) * k * k; // squared decay = sharp transient
+    }
+    const ns = ctx.createBufferSource(); ns.buffer = nb;
+    const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 0.8; bp.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(level, at + 0.0015);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+    ns.connect(bp).connect(g).connect(ctx.destination);
+    ns.start(at); ns.stop(at + len);
+  }
+  blade(t0, 4400, 0.55);          // first blade
+  blade(t0 + 0.05, 3200, 0.65);   // second blade closing — the actual cut
+
+  // brief metallic "shink" as the blades meet
+  const o = ctx.createOscillator(); o.type = "square"; o.frequency.value = 3100;
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2200;
   const og = ctx.createGain();
   og.gain.setValueAtTime(0.0001, t0 + 0.05);
-  og.gain.exponentialRampToValueAtTime(0.3, t0 + 0.066);
-  og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
-  o.connect(og).connect(ctx.destination);
-  o.start(t0 + 0.05); o.stop(t0 + 0.22);
+  og.gain.exponentialRampToValueAtTime(0.13, t0 + 0.055);
+  og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.13);
+  o.connect(hp).connect(og).connect(ctx.destination);
+  o.start(t0 + 0.05); o.stop(t0 + 0.14);
 }
 
 function printFx() {
