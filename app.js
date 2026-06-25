@@ -106,9 +106,42 @@ function applySeason(forceKey) {
 }
 const BADGES = { spring: "🌸", summer: "☀️", monsoon: "🌧️", winter: "❄️" };
 
+// little drawn (non-emoji) flower: five petals + a centre, colours passed in
+function flowerSVG(petal, centre) {
+  return (
+    `<svg viewBox="0 0 24 24"><g fill="${petal}">` +
+    `<circle cx="12" cy="7" r="3.7"/><circle cx="7.24" cy="10.45" r="3.7"/>` +
+    `<circle cx="9.06" cy="16.05" r="3.7"/><circle cx="14.94" cy="16.05" r="3.7"/>` +
+    `<circle cx="16.76" cy="10.45" r="3.7"/></g>` +
+    `<circle cx="12" cy="12" r="3" fill="${centre}"/></svg>`
+  );
+}
+const FLOWER_COLORS = [
+  ["#e87aa6", "#f6d743"], ["#f0ebed", "#f3b34a"],
+  ["#b79be0", "#f6d743"], ["#ef9a76", "#f6d743"],
+];
+
+// a drawn (non-emoji) bee: striped body, head, wings, antennae — faces right (flies right)
+const BEE_SVG =
+  `<svg viewBox="0 0 44 26">` +
+  `<defs><clipPath id="beeClip"><ellipse cx="23" cy="14" rx="13" ry="8.2"/></clipPath></defs>` +
+  `<g class="bee-wings">` +
+  `<ellipse cx="13" cy="6" rx="8" ry="5" fill="rgba(228,241,255,0.72)" stroke="#93b1c9" stroke-width="0.6"/>` +
+  `<ellipse cx="20" cy="5" rx="9" ry="5.6" fill="rgba(228,241,255,0.8)" stroke="#93b1c9" stroke-width="0.6"/></g>` +
+  `<ellipse cx="23" cy="14" rx="13" ry="8.2" fill="#f2b705"/>` +
+  `<g clip-path="url(#beeClip)" fill="#23211c">` +
+  `<rect x="15.5" y="4" width="3.4" height="20"/><rect x="22.5" y="4" width="3.4" height="20"/>` +
+  `<rect x="29.5" y="4" width="3.4" height="20"/></g>` +
+  `<circle cx="36" cy="13" r="5" fill="#23211c"/><circle cx="37.6" cy="11.4" r="1" fill="#fff"/>` +
+  `<path d="M10 14 L3 11 L4.6 14 L3 17 Z" fill="#23211c"/>` +
+  `<line x1="36" y1="9" x2="39" y2="5" stroke="#23211c" stroke-width="0.9"/>` +
+  `<line x1="38" y1="10" x2="41" y2="7" stroke="#23211c" stroke-width="0.9"/></svg>`;
+
 // Build the animated weather layer for the active season (decorative, behind the text).
 function buildSeasonFx(key) {
   const fx = $("#seasonFx");
+  const fxTop = $("#seasonFxTop");
+  if (fxTop) fxTop.innerHTML = "";
   if (!fx) return;
   fx.innerHTML = "";
   if (!key) return;
@@ -126,14 +159,24 @@ function buildSeasonFx(key) {
       for (let i = 0; i < 7; i++) {
         const fl = document.createElement("span");
         fl.className = "bloom " + edge;
-        fl.textContent = Math.random() < 0.5 ? "🌸" : "🌼";
+        const [petal, centre] = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+        fl.innerHTML = flowerSVG(petal, centre);
+        const sz = rnd(13, 20);
         fl.style.left = rnd(2, 94) + "%";
-        fl.style.fontSize = rnd(11, 17) + "px";
+        fl.style.width = sz + "px";
+        fl.style.height = sz + "px";
         fl.style.animationDuration = rnd(2.6, 5) + "s";
         fl.style.animationDelay = -rnd(0, 3) + "s";
         fx.appendChild(fl);
       }
     });
+    // a bee drifts across the receipt (in the layer above the text)
+    if (fxTop) {
+      const bee = document.createElement("div");
+      bee.className = "bee";
+      bee.innerHTML = BEE_SVG;
+      fxTop.appendChild(bee);
+    }
     return;
   }
 
@@ -629,54 +672,72 @@ function getCtx() {
   } catch (e) { return null; }
 }
 
-// A real-printer feel: a wobbling motor hum + ratchety head grains whose timing,
-// loudness and pitch vary, with occasional carriage-return pauses between "lines".
+// A realistic thermal/receipt-printer feed, built from layers that all run together:
+//  (1) a stepper-motor buzz — a bandpassed sawtooth amplitude-modulated at the step rate,
+//  (2) a thin metallic octave on top, (3) faint continuous paper hiss, and
+//  (4) steady gear ticks at a regular rate. Steadiness (not random bursts) is what reads
+//  as a real machine.
 function playPrintSound(ms) {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
   const dur = ms / 1000;
+  const end = t0 + dur;
 
-  // motor hum underneath, speed wobbling slightly
-  const motor = ctx.createOscillator(); motor.type = "sawtooth";
-  const motorGain = ctx.createGain();
-  const motorLp = ctx.createBiquadFilter(); motorLp.type = "lowpass"; motorLp.frequency.value = 240;
-  motorGain.gain.setValueAtTime(0.0001, t0);
-  motorGain.gain.linearRampToValueAtTime(0.035, t0 + 0.1);
-  let mt = 0;
-  while (mt < dur) {
-    motor.frequency.setValueAtTime(50 + Math.random() * 16, t0 + mt);
-    mt += 0.07 + Math.random() * 0.07;
-  }
-  motorGain.gain.setValueAtTime(0.035, t0 + Math.max(0, dur - 0.12));
-  motorGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  motor.connect(motorLp).connect(motorGain).connect(ctx.destination);
-  motor.start(t0); motor.stop(t0 + dur);
+  // shared master with clean in/out fades so it never clicks
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  master.gain.exponentialRampToValueAtTime(0.06, t0 + 0.06);
+  master.gain.setValueAtTime(0.06, Math.max(t0 + 0.06, end - 0.08));
+  master.gain.exponentialRampToValueAtTime(0.0001, end);
+  master.connect(ctx.destination);
 
-  // ratchety print head: bursts of filtered noise, jittered in time/level/pitch
+  // (1) stepper-motor buzz: sawtooth narrowed by a bandpass, gain modulated at the step rate
+  const saw = ctx.createOscillator(); saw.type = "sawtooth"; saw.frequency.value = 118;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 950; bp.Q.value = 6;
+  const am = ctx.createGain(); am.gain.value = 0.55;                  // carrier level (modulated below)
+  const step = ctx.createOscillator(); step.type = "square"; step.frequency.value = 52;
+  const stepDepth = ctx.createGain(); stepDepth.gain.value = 0.4;     // → AM gives the "brzzz"
+  step.connect(stepDepth).connect(am.gain);
+  const wob = ctx.createOscillator(); wob.type = "sine"; wob.frequency.value = 3.5;
+  const wobDepth = ctx.createGain(); wobDepth.gain.value = 6;         // slow pitch drift
+  wob.connect(wobDepth).connect(saw.frequency);
+  saw.connect(bp).connect(am).connect(master);
+
+  // (2) thin octave-up layer for a metallic edge
+  const sq = ctx.createOscillator(); sq.type = "square"; sq.frequency.value = 236;
+  const sqbp = ctx.createBiquadFilter(); sqbp.type = "bandpass"; sqbp.frequency.value = 2400; sqbp.Q.value = 8;
+  const sqGain = ctx.createGain(); sqGain.gain.value = 0.05;
+  sq.connect(sqbp).connect(sqGain).connect(master);
+
+  [saw, step, wob, sq].forEach((o) => { o.start(t0); o.stop(end); });
+
+  // one noise buffer feeds both the hiss and the ticks
   const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
-  const ch = buf.getChannelData(0);
-  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t0);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
-  let t = 0, line = 0;
-  const lineLen = 7 + Math.floor(Math.random() * 7);
+  // (3) faint continuous paper hiss
+  const hissSrc = ctx.createBufferSource(); hissSrc.buffer = buf;
+  const hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2800;
+  const hiss = ctx.createGain(); hiss.gain.value = 0.013;
+  hissSrc.connect(hp).connect(hiss).connect(master);
+  hissSrc.start(t0); hissSrc.stop(end);
+
+  // (4) steady gear ticks — short clicks at a regular ~13/s (tiny jitter only)
+  const tickSrc = ctx.createBufferSource(); tickSrc.buffer = buf;
+  const tickBp = ctx.createBiquadFilter(); tickBp.type = "bandpass"; tickBp.frequency.value = 2000; tickBp.Q.value = 1.4;
+  const tick = ctx.createGain(); tick.gain.setValueAtTime(0.0001, t0);
+  tickSrc.connect(tickBp).connect(tick).connect(master);
+  tickSrc.start(t0); tickSrc.stop(end);
+  let t = 0;
   while (t < dur) {
-    const onset = t0 + t;
-    const len = 0.016 + Math.random() * 0.03;     // burst length varies
-    const amp = 0.05 + Math.random() * 0.13;       // loudness varies
-    gain.gain.setValueAtTime(amp, onset);
-    gain.gain.exponentialRampToValueAtTime(0.008, onset + len * 0.75);
-    bp.frequency.setValueAtTime(850 + Math.random() * 2300, onset); // pitch/timbre varies
-    t += len + 0.004 + Math.random() * 0.01;
-    if (++line % lineLen === 0) t += 0.07 + Math.random() * 0.1;     // carriage-return pause
+    const on = t0 + t;
+    tick.gain.setValueAtTime(0.0001, on);
+    tick.gain.linearRampToValueAtTime(0.5, on + 0.0015);
+    tick.gain.exponentialRampToValueAtTime(0.0001, on + 0.02);
+    t += 0.075 + Math.random() * 0.012;            // regular cadence, slight jitter
   }
-  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(bp).connect(gain).connect(ctx.destination);
-  src.start(t0); src.stop(t0 + dur);
 }
 
 // A struck desk/service bell: bright metallic strike + inharmonic partials that ring out.

@@ -540,21 +540,45 @@ body {
 /* spring: little flowers nodding along the top & bottom borders */
 .bloom {
   position: absolute;
-  line-height: 1;
+  line-height: 0;
   transform-origin: 50% 100%;
   animation-name: sway;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
 }
-.bloom.top { top: 1px; }
-.bloom.bottom { bottom: 1px; }
+.bloom svg { width: 100%; height: 100%; display: block; }
+.bloom.top { top: 2px; }
+.bloom.bottom { bottom: 2px; }
 @keyframes sway {
   0%, 100% { transform: rotate(-12deg) scale(1); }
   50%      { transform: rotate(12deg) scale(1.1); }
 }
 
+/* a layer above the receipt text, for the bee that crosses the page */
+.season-fx-top { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.bee {
+  position: absolute;
+  top: 34%;
+  left: -18%;
+  width: 34px;
+  animation: beeAcross 8.5s linear infinite;
+}
+.bee svg { width: 100%; height: auto; display: block; }
+.bee .bee-wings { transform-origin: 50% 75%; animation: beeWings 0.11s ease-in-out infinite; }
+@keyframes beeAcross {
+  0%   { left: -18%; transform: translateY(0) rotate(6deg); }
+  20%  { transform: translateY(-18px) rotate(-5deg); }
+  45%  { transform: translateY(10px) rotate(6deg); }
+  70%  { transform: translateY(-12px) rotate(-4deg); }
+  100% { left: 116%; transform: translateY(0) rotate(6deg); }
+}
+@keyframes beeWings {
+  0%, 100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.55); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .season-fx * { animation: none !important; }
+  .season-fx *, .season-fx-top * { animation: none !important; }
 }
 
 /* ---- gear / settings button ---- */
