@@ -100,7 +100,7 @@ function applySeason() {
   if (badge) badge.textContent = s.badge;
 }
 
-/* ---- coupon (compact, optional, seeded by the day) ----------------------- */
+/* ---- coupon (compact, optional, seeded by the day; tap to redeem) -------- */
 function renderCoupon(when) {
   const el = $("#coupon");
   if (!el) return;
@@ -108,8 +108,22 @@ function renderCoupon(when) {
   el.hidden = false;
   const pct = 5 + (parseInt(when.ymd, 10) % 3) * 5;      // 5 / 10 / 15% — stable per day
   const code = "IDEA-" + when.ymd.slice(4) + when.hm;     // MMDDHHMM
-  el.textContent = `✁  SAVE ${pct}% ON YOUR NEXT IDEA  ·  ${code}`;
+  el.dataset.day = when.ymd;                              // redemption is per-day, not per-print
+  el.dataset.label = `✁  SAVE ${pct}% ON YOUR NEXT IDEA  ·  ${code}`;
+  setCouponState(el, localStorage.getItem("coupon:" + when.ymd) === "1");
 }
+function setCouponState(el, redeemed) {
+  el.classList.toggle("redeemed", redeemed);
+  el.textContent = redeemed ? "✓  REDEEMED — ENJOY YOUR IDEA" : (el.dataset.label || "");
+}
+$("#coupon")?.addEventListener("click", () => {
+  const el = $("#coupon");
+  const day = el.dataset.day;
+  if (!day) return;
+  const redeemed = localStorage.getItem("coupon:" + day) !== "1";
+  localStorage.setItem("coupon:" + day, redeemed ? "1" : "0");
+  setCouponState(el, redeemed);
+});
 
 /* ---- lifetime tally (only bumped on a genuine print) --------------------- */
 function setLifetimeText(p) {
