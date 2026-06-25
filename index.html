@@ -75,16 +75,11 @@
       </div>
     </section>
 
-    <form class="addbar" id="addForm" autocomplete="off">
-      <input class="addbar-input" id="ideaInput" type="text" placeholder="+ jot a new idea…" maxlength="120" />
-      <button class="reprint-btn addbar-btn" id="addIdea" type="submit">add</button>
-    </form>
-    <div class="addnote" id="addNote" hidden></div>
+    <a class="reprint-btn jot-btn" id="jot" href="#" target="_blank" rel="noopener">✎ jot a new idea in Notion</a>
 
     <div class="actions">
       <button class="reprint-btn" id="reprint" type="button">↻ reprint</button>
-      <button class="reprint-btn save-btn" id="save" type="button">⬇ save</button>
-      <a class="reprint-btn notion-link" id="notion" href="#" target="_blank" rel="noopener">⤴ notion</a>
+      <button class="reprint-btn save-btn" id="save" type="button">⬇ save image</button>
     </div>
     <p class="hint" id="hint">auto-syncs from your Notion ideas &middot; tap an idea to cross it off</p>
   </main>
@@ -113,10 +108,6 @@
       <label class="set-row"><span>Seasonal skins</span><input type="checkbox" id="setSeason" /></label>
       <label class="set-row"><span>Coupon</span><input type="checkbox" id="setCoupon" /></label>
       <label class="set-row"><span>New-idea alerts</span><input type="checkbox" id="setNotify" /></label>
-      <label class="set-row col"><span>Add-idea sync URL</span>
-        <input type="url" id="setEndpoint" placeholder="https://…workers.dev" />
-      </label>
-      <p class="set-note">The sync URL points at your Notion-writer worker (see README). Leave blank to disable adding ideas from here.</p>
     </div>
   </div>
 

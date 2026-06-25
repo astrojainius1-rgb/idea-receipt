@@ -446,9 +446,9 @@ body {
   top: calc(8px + env(safe-area-inset-top));
   right: calc(10px + env(safe-area-inset-right));
   z-index: 6;
-  width: 34px; height: 34px;
+  width: 42px; height: 42px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px;
+  font-size: 21px;
   color: var(--paper);
   background: rgba(255,255,255,0.10);
   border: 1px solid rgba(255,255,255,0.22);
@@ -458,36 +458,8 @@ body {
 }
 .gear:active { transform: scale(0.94); }
 
-/* ---- add-an-idea bar ---- */
-.addbar {
-  display: flex;
-  gap: 10px;
-  margin: 16px 0 0;
-}
-.addbar-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: var(--mono);
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--paper);
-  border: 1px solid rgba(255,255,255,0.22);
-  border-radius: 8px;
-  padding: 11px 12px;
-}
-.addbar-input::placeholder { color: var(--ink-soft); }
-.addbar-btn { flex: 0 0 84px; margin: 0; }
-.addnote {
-  text-align: center;
-  font-size: 10.5px;
-  letter-spacing: 0.4px;
-  color: rgba(255,255,255,0.6);
-  margin: 8px 0 0;
-}
-.addnote[hidden] { display: none; }
-
-/* notion link styled as the 3rd action button */
-.notion-link {
+/* ---- jot-a-new-idea link (opens the Notion page) ---- */
+.jot-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -574,8 +546,6 @@ html[data-theme="light"] .gear {
   background: rgba(0,0,0,0.06);
   border-color: rgba(0,0,0,0.18);
 }
-html[data-theme="light"] .addbar-input { border-color: rgba(0,0,0,0.18); }
 html[data-theme="light"] .hint { color: rgba(0,0,0,0.5); }
-html[data-theme="light"] .addnote { color: rgba(0,0,0,0.6); }
 html[data-theme="light"] .ptr { color: rgba(0,0,0,0.6); }
 html[data-theme="light"] .ptr.ready { color: #000; }

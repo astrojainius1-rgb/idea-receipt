@@ -40,8 +40,7 @@ function agoText(iso) {
 
 /* ---- user settings (persisted) ------------------------------------------- */
 const DEFAULT_SETTINGS = {
-  theme: "auto", sort: "default", sound: true, season: true, coupon: true,
-  notify: false, endpoint: "",
+  theme: "auto", sort: "default", sound: true, season: true, coupon: true, notify: false,
 };
 let settings = loadSettings();
 function loadSettings() {
@@ -312,8 +311,8 @@ function render(data, animate) {
 
   const url = data.docUrl || location.href;
   buildCode(url);
-  const notion = $("#notion");
-  if (notion) notion.href = url;
+  const jot = $("#jot");
+  if (jot) jot.href = url; // "jot a new idea" opens the Notion page itself
   $("#barnum").textContent = group4(serial(when.ymd, count, totalWords));
   let host = "this receipt";
   try { host = new URL(url).host.replace(/^www\./, ""); } catch (e) {}
@@ -502,41 +501,6 @@ async function notify(title, body) {
   } catch (e) { /* notifications unsupported — ignore */ }
 }
 
-function flashAdd(msg) {
-  const el = $("#addNote");
-  if (!el) return;
-  el.textContent = msg;
-  el.hidden = false;
-  clearTimeout(flashAdd._t);
-  flashAdd._t = setTimeout(() => { el.hidden = true; }, 3800);
-}
-
-// POST the new idea to the user's Notion-writer worker; show it as "pending" until it syncs
-async function addIdea() {
-  const input = $("#ideaInput");
-  const title = (input?.value || "").trim();
-  if (!title) return;
-  const ep = (settings.endpoint || "").trim();
-  if (!ep) { flashAdd("set your add-idea sync URL in ⚙ settings first"); openSheet(); return; }
-  const btn = $("#addIdea");
-  if (btn) { btn.disabled = true; btn.textContent = "…"; }
-  try {
-    const res = await fetch(ep, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    pendingIdeas.add(title);
-    savePending();
-    if (input) input.value = "";
-    rerender();
-    flashAdd("added ✓ — it'll print on the next Notion sync");
-  } catch (e) {
-    console.error("addIdea failed", e);
-    flashAdd("couldn't reach your sync URL — check ⚙ settings");
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "add"; }
-  }
-}
-$("#addForm")?.addEventListener("submit", (e) => { e.preventDefault(); addIdea(); });
-
 /* ---- settings sheet ------------------------------------------------------ */
 function openSheet() { syncSheet(); $("#sheet").hidden = false; }
 function closeSheet() { $("#sheet").hidden = true; }
@@ -548,7 +512,6 @@ function syncSheet() {
   set("#setSeason", "checked", settings.season);
   set("#setCoupon", "checked", settings.coupon);
   set("#setNotify", "checked", settings.notify);
-  set("#setEndpoint", "value", settings.endpoint || "");
 }
 $("#gear")?.addEventListener("click", openSheet);
 $("#sheetClose")?.addEventListener("click", closeSheet);
@@ -559,7 +522,6 @@ $("#setSort")?.addEventListener("change", (e) => { settings.sort = e.target.valu
 $("#setSound")?.addEventListener("change", (e) => { settings.sound = e.target.checked; saveSettings(); });
 $("#setSeason")?.addEventListener("change", (e) => { settings.season = e.target.checked; saveSettings(); applySeason(); });
 $("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.checked; saveSettings(); rerender(); });
-$("#setEndpoint")?.addEventListener("change", (e) => { settings.endpoint = e.target.value.trim(); saveSettings(); });
 $("#setNotify")?.addEventListener("change", async (e) => {
   if (e.target.checked) {
     if (!("Notification" in window)) { flashAdd("notifications aren't supported here"); e.target.checked = false; return; }
@@ -590,59 +552,54 @@ function getCtx() {
   } catch (e) { return null; }
 }
 
-// Dot-matrix / receipt-printer feel: a steady stepper-motor whine underneath, with the
-// head printing line-by-line — each line a rapid buzz, separated by short paper-feed gaps.
+// A real-printer feel: a wobbling motor hum + ratchety head grains whose timing,
+// loudness and pitch vary, with occasional carriage-return pauses between "lines".
 function playPrintSound(ms) {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
   const dur = ms / 1000;
-  const out = ctx.createGain(); out.gain.value = 0.9; out.connect(ctx.destination);
 
-  // 1) stepper-motor whine — a steady high tone with light vibrato (the constant "eeee")
-  const whine = ctx.createOscillator(); whine.type = "square"; whine.frequency.value = 168;
-  const whineLp = ctx.createBiquadFilter(); whineLp.type = "lowpass"; whineLp.frequency.value = 1500;
-  const whineGain = ctx.createGain(); whineGain.gain.value = 0.011;
-  const vib = ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 7.5;
-  const vibAmt = ctx.createGain(); vibAmt.gain.value = 9;
-  vib.connect(vibAmt).connect(whine.frequency);
-  whine.connect(whineLp).connect(whineGain).connect(out);
-  whine.start(t0); whine.stop(t0 + dur); vib.start(t0); vib.stop(t0 + dur);
-
-  // 2) gritty noise bed, gated per line for the paper/ink texture
-  const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
-  const nd = buf.getChannelData(0);
-  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource(); noise.buffer = buf;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 0.9; bp.frequency.value = 1700;
-  const nGain = ctx.createGain(); nGain.gain.setValueAtTime(0.0001, t0);
-  noise.connect(bp).connect(nGain).connect(out);
-  noise.start(t0); noise.stop(t0 + dur);
-
-  // 3) buzzy square "head" that prints each line — pitch shifts slightly line to line
-  const head = ctx.createOscillator(); head.type = "square"; head.frequency.value = 110;
-  const headBp = ctx.createBiquadFilter(); headBp.type = "bandpass"; headBp.Q.value = 0.7; headBp.frequency.value = 1400;
-  const hGain = ctx.createGain(); hGain.gain.setValueAtTime(0.0001, t0);
-  head.connect(headBp).connect(hGain).connect(out);
-  head.start(t0); head.stop(t0 + dur);
-
-  // schedule the print line-by-line: a dense buzz, then a brief feed gap
-  let t = 0;
-  while (t < dur) {
-    const lineDur = 0.06 + Math.random() * 0.07;   // how long this line takes to print
-    const gap = 0.018 + Math.random() * 0.03;       // paper-feed pause between lines
-    const on = t0 + t;
-    const off = t0 + Math.min(dur, t + lineDur);
-    const lvl = 0.05 + Math.random() * 0.05;
-    head.frequency.setValueAtTime(95 + Math.random() * 50, on); // each line buzzes at a slightly different pitch
-    hGain.gain.setValueAtTime(lvl, on);
-    hGain.gain.setValueAtTime(lvl, Math.max(on, off - 0.006));
-    hGain.gain.linearRampToValueAtTime(0.0001, off);            // sharp cut at line end
-    nGain.gain.setValueAtTime(0.04 + Math.random() * 0.03, on);
-    bp.frequency.setValueAtTime(1400 + Math.random() * 900, on);
-    nGain.gain.linearRampToValueAtTime(0.0001, off);
-    t += lineDur + gap;
+  // motor hum underneath, speed wobbling slightly
+  const motor = ctx.createOscillator(); motor.type = "sawtooth";
+  const motorGain = ctx.createGain();
+  const motorLp = ctx.createBiquadFilter(); motorLp.type = "lowpass"; motorLp.frequency.value = 240;
+  motorGain.gain.setValueAtTime(0.0001, t0);
+  motorGain.gain.linearRampToValueAtTime(0.035, t0 + 0.1);
+  let mt = 0;
+  while (mt < dur) {
+    motor.frequency.setValueAtTime(50 + Math.random() * 16, t0 + mt);
+    mt += 0.07 + Math.random() * 0.07;
   }
+  motorGain.gain.setValueAtTime(0.035, t0 + Math.max(0, dur - 0.12));
+  motorGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  motor.connect(motorLp).connect(motorGain).connect(ctx.destination);
+  motor.start(t0); motor.stop(t0 + dur);
+
+  // ratchety print head: bursts of filtered noise, jittered in time/level/pitch
+  const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, t0);
+
+  let t = 0, line = 0;
+  const lineLen = 7 + Math.floor(Math.random() * 7);
+  while (t < dur) {
+    const onset = t0 + t;
+    const len = 0.016 + Math.random() * 0.03;     // burst length varies
+    const amp = 0.05 + Math.random() * 0.13;       // loudness varies
+    gain.gain.setValueAtTime(amp, onset);
+    gain.gain.exponentialRampToValueAtTime(0.008, onset + len * 0.75);
+    bp.frequency.setValueAtTime(850 + Math.random() * 2300, onset); // pitch/timbre varies
+    t += len + 0.004 + Math.random() * 0.01;
+    if (++line % lineLen === 0) t += 0.07 + Math.random() * 0.1;     // carriage-return pause
+  }
+  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(bp).connect(gain).connect(ctx.destination);
+  src.start(t0); src.stop(t0 + dur);
 }
 
 // A struck desk/service bell: bright metallic strike + inharmonic partials that ring out.

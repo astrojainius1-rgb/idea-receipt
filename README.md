@@ -24,16 +24,9 @@ Tap the **⚙ gear** (top-right) for settings. Everything is stored on the devic
 - **Seasonal skins** — the paper subtly retints near holidays (auto by date; toggleable).
 - **Coupon** — a daily tear-off coupon at the bottom (toggleable).
 - **Theme** — auto / light / dark.
-- **Save / Notion** buttons — save the receipt as a PNG (share sheet on mobile), or jump
-  to the source Notion page.
+- **Jot a new idea** — the link under the receipt opens the source Notion page so you can
+  add an idea there; it prints here on the next sync.
+- **Save** — save the receipt as a PNG (share sheet on mobile).
 - **New-idea alerts** — opt-in local notification when a fresh idea syncs. (Delivery while
   the app is fully closed needs a push backend; foreground/recent works today.)
 - **Offline** — a service worker caches the shell + last receipt.
-
-## Add an idea from the page (optional)
-
-The page can append an idea straight to Notion via a tiny **Cloudflare Worker** that holds
-the Notion token server-side (never in the browser). Deploy [`worker.js`](worker.js)
-(setup steps are in its header comment), then paste the worker URL into
-**⚙ settings → Add-idea sync URL**. New ideas show as "pending" until the next sync prints
-them for real. Leave the URL blank to disable adding from the page.
