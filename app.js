@@ -40,7 +40,7 @@ function agoText(iso) {
 
 /* ---- user settings (persisted) ------------------------------------------- */
 const DEFAULT_SETTINGS = {
-  theme: "auto", sort: "default", sound: true, season: true, coupon: true, notify: false,
+  theme: "auto", sort: "default", sound: true, season: true, seasonPick: "auto", coupon: true, notify: false,
 };
 let settings = loadSettings();
 function loadSettings() {
@@ -92,8 +92,12 @@ function currentSeason() {
 function applySeason(forceKey) {
   const r = $("#receipt");
   if (!r) return;
+  // priority: explicit forceKey (tests) → seasonal skins off → a manually-picked season → auto by date
+  const pick = settings.seasonPick;
   const s = forceKey ? { key: forceKey, badge: BADGES[forceKey] || "" }
-    : settings.season ? currentSeason() : { key: "", badge: "" };
+    : !settings.season ? { key: "", badge: "" }
+    : pick && pick !== "auto" ? { key: pick, badge: BADGES[pick] || "" }
+    : currentSeason();
   SEASON_KEYS.forEach((k) => r.classList.remove("season-" + k));
   if (s.key) r.classList.add("season-" + s.key);
   const badge = $("#seasonBadge");
@@ -581,6 +585,7 @@ function syncSheet() {
   set("#setSort", "value", settings.sort);
   set("#setSound", "checked", settings.sound);
   set("#setSeason", "checked", settings.season);
+  set("#setSeasonPick", "value", settings.seasonPick);
   set("#setCoupon", "checked", settings.coupon);
   set("#setNotify", "checked", settings.notify);
 }
@@ -592,6 +597,7 @@ $("#setTheme")?.addEventListener("change", (e) => { settings.theme = e.target.va
 $("#setSort")?.addEventListener("change", (e) => { settings.sort = e.target.value; saveSettings(); rerender(); });
 $("#setSound")?.addEventListener("change", (e) => { settings.sound = e.target.checked; saveSettings(); });
 $("#setSeason")?.addEventListener("change", (e) => { settings.season = e.target.checked; saveSettings(); applySeason(); });
+$("#setSeasonPick")?.addEventListener("change", (e) => { settings.seasonPick = e.target.value; saveSettings(); applySeason(); });
 $("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.checked; saveSettings(); rerender(); });
 $("#setNotify")?.addEventListener("change", async (e) => {
   if (e.target.checked) {
