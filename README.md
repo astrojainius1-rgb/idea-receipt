@@ -5,8 +5,11 @@ phone (Add to Home Screen for a full-screen app).
 
 - The page reads only `data.json` and polls it every ~30s.
 - **Auto-sync:** a GitHub Action (`.github/workflows/sync.yml`) runs `sync_notion.py`
-  every ~10 min to rebuild `data.json` from Notion — works even when your Mac is off.
+  to rebuild `data.json` from Notion — works even when your Mac is off.
   Needs a `NOTION_TOKEN` repo secret (see [`sync-notes.md`](sync-notes.md)).
+- **Reliable trigger:** GitHub's *scheduled* runner is best-effort and often skips for
+  hours, so a Cloudflare Worker ([`sync-worker.js`](sync-worker.js) + [`wrangler.toml`](wrangler.toml))
+  fires the sync on a dependable cron. Setup steps are in the worker's header comment.
 - Manual refresh is still available: say "sync my ideas" to Claude, or run the workflow
   from the **Actions** tab.
 - Source Notion page: **Ideas**.

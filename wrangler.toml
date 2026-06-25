@@ -1,0 +1,18 @@
+# Cloudflare Worker config for the reliable Notion->GitHub sync trigger (sync-worker.js).
+# Deploy:  wrangler deploy   then   wrangler secret put GH_TOKEN
+name = "idea-receipt-sync"
+main = "sync-worker.js"
+compatibility_date = "2024-10-01"
+
+# Cloudflare cron triggers ARE reliable (unlike GitHub's scheduled Actions).
+# Every 10 minutes; adjust if you want it more/less frequent.
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Non-secret config. The token (GH_TOKEN) and optional TRIGGER_KEY are set with
+# `wrangler secret put ...`, never committed here.
+[vars]
+GH_OWNER = "astrojainius1-rgb"
+GH_REPO = "idea-receipt"
+GH_WORKFLOW = "sync.yml"
+GH_REF = "main"
