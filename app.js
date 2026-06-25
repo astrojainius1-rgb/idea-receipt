@@ -157,6 +157,39 @@ const SEASON_BADGE_SVG = {
     `<line x1="12" y1="19" x2="9.5" y2="21"/><line x1="12" y1="19" x2="14.5" y2="21"/></g></svg>`,
 };
 
+// "auto / by date" gets a little calendar mark (inherits the text colour)
+const AUTO_ICON_SVG =
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">` +
+  `<rect x="4" y="5.5" width="16" height="14.5" rx="2"/><line x1="4" y1="10" x2="20" y2="10"/>` +
+  `<line x1="8.5" y1="3" x2="8.5" y2="7"/><line x1="15.5" y1="3" x2="15.5" y2="7"/></svg>`;
+const SEASON_OPTS = [
+  { key: "auto", label: "Auto", icon: AUTO_ICON_SVG },
+  { key: "spring", label: "Spring", icon: SEASON_BADGE_SVG.spring },
+  { key: "summer", label: "Summer", icon: SEASON_BADGE_SVG.summer },
+  { key: "monsoon", label: "Monsoon", icon: SEASON_BADGE_SVG.monsoon },
+  { key: "winter", label: "Winter", icon: SEASON_BADGE_SVG.winter },
+];
+// SVG season picker for the settings sheet (native <select> can't hold SVG)
+function buildSeasonPicker() {
+  const c = $("#seasonPicker");
+  if (!c) return;
+  c.innerHTML = "";
+  SEASON_OPTS.forEach((o) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "season-opt";
+    b.dataset.key = o.key;
+    b.innerHTML = `<span class="season-opt-ic">${o.icon}</span><span class="season-opt-lbl">${o.label}</span>`;
+    b.addEventListener("click", () => { settings.seasonPick = o.key; saveSettings(); applySeason(); markSeasonPicker(); });
+    c.appendChild(b);
+  });
+  markSeasonPicker();
+}
+function markSeasonPicker() {
+  document.querySelectorAll("#seasonPicker .season-opt").forEach((b) =>
+    b.classList.toggle("active", b.dataset.key === settings.seasonPick));
+}
+
 // a drawn (non-emoji) bee: striped body, head, wings, antennae — faces right (flies right)
 const BEE_SVG =
   `<svg viewBox="0 0 44 26">` +
@@ -674,7 +707,7 @@ function syncSheet() {
   set("#setSort", "value", settings.sort);
   set("#setSound", "checked", settings.sound);
   set("#setSeason", "checked", settings.season);
-  set("#setSeasonPick", "value", settings.seasonPick);
+  markSeasonPicker();
   set("#setCoupon", "checked", settings.coupon);
   set("#setNotify", "checked", settings.notify);
 }
@@ -686,7 +719,7 @@ $("#setTheme")?.addEventListener("change", (e) => { settings.theme = e.target.va
 $("#setSort")?.addEventListener("change", (e) => { settings.sort = e.target.value; saveSettings(); rerender(); });
 $("#setSound")?.addEventListener("change", (e) => { settings.sound = e.target.checked; saveSettings(); });
 $("#setSeason")?.addEventListener("change", (e) => { settings.season = e.target.checked; saveSettings(); applySeason(); });
-$("#setSeasonPick")?.addEventListener("change", (e) => { settings.seasonPick = e.target.value; saveSettings(); applySeason(); });
+buildSeasonPicker();
 $("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.checked; saveSettings(); rerender(); });
 $("#setNotify")?.addEventListener("change", async (e) => {
   if (e.target.checked) {
