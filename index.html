@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,15 +15,18 @@
 </head>
 <body>
   <div class="ptr" id="ptr">↓ pull to reprint</div>
+  <button class="gear" id="gear" type="button" aria-label="settings">&#9881;&#65038;</button>
+
   <main class="stage">
     <section class="receipt" id="receipt" aria-label="Idea receipt">
       <div class="sweep" id="sweep" aria-hidden="true"></div>
+      <div class="season-badge" id="seasonBadge" aria-hidden="true"></div>
       <div class="printroll">
       <div class="synced-bar"><span class="synced-ago" id="syncedAgo">synced --</span></div>
       <header class="head">
         <div class="logo">&#128173;</div>
         <h1 class="store" id="store">IDEA RECEIPT CO.</h1>
-        <div class="tagline" id="tagline">est. whenever &mdash; ideas, freshly printed</div>
+        <div class="tagline" id="tagline">est. whenever</div>
         <div class="meta">
           <span id="order">ORDER #0000</span>
           <span id="synced">--</span>
@@ -60,6 +63,8 @@
       <div class="barnum" id="barnum">0000 0000 0000</div>
       <div class="barcap" id="barcap"></div>
 
+      <div class="coupon" id="coupon" hidden></div>
+
       <div class="rule"></div>
       <div class="billed">
         <span class="billed-label">billed to</span>
@@ -70,12 +75,50 @@
       </div>
     </section>
 
+    <form class="addbar" id="addForm" autocomplete="off">
+      <input class="addbar-input" id="ideaInput" type="text" placeholder="+ jot a new idea…" maxlength="120" />
+      <button class="reprint-btn addbar-btn" id="addIdea" type="submit">add</button>
+    </form>
+    <div class="addnote" id="addNote" hidden></div>
+
     <div class="actions">
       <button class="reprint-btn" id="reprint" type="button">↻ reprint</button>
-      <button class="reprint-btn save-btn" id="save" type="button">⬇ save image</button>
+      <button class="reprint-btn save-btn" id="save" type="button">⬇ save</button>
+      <a class="reprint-btn notion-link" id="notion" href="#" target="_blank" rel="noopener">⤴ notion</a>
     </div>
-    <p class="hint" id="hint">auto-syncs from your Notion ideas &middot; tap reprint or pull down anytime</p>
+    <p class="hint" id="hint">auto-syncs from your Notion ideas &middot; tap an idea to cross it off</p>
   </main>
+
+  <!-- settings sheet -->
+  <div class="sheet" id="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-label="Settings" aria-modal="true">
+      <div class="sheet-head"><span>SETTINGS</span><button class="sheet-x" id="sheetClose" type="button" aria-label="close">&#10005;</button></div>
+
+      <label class="set-row"><span>Theme</span>
+        <select id="setTheme">
+          <option value="auto">Auto</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <label class="set-row"><span>Sort ideas</span>
+        <select id="setSort">
+          <option value="default">Notion order</option>
+          <option value="new">Newest first</option>
+          <option value="price">Priciest first</option>
+          <option value="az">A → Z</option>
+        </select>
+      </label>
+      <label class="set-row"><span>Sound effects</span><input type="checkbox" id="setSound" /></label>
+      <label class="set-row"><span>Seasonal skins</span><input type="checkbox" id="setSeason" /></label>
+      <label class="set-row"><span>Coupon</span><input type="checkbox" id="setCoupon" /></label>
+      <label class="set-row"><span>New-idea alerts</span><input type="checkbox" id="setNotify" /></label>
+      <label class="set-row col"><span>Add-idea sync URL</span>
+        <input type="url" id="setEndpoint" placeholder="https://…workers.dev" />
+      </label>
+      <p class="set-note">The sync URL points at your Notion-writer worker (see README). Leave blank to disable adding ideas from here.</p>
+    </div>
+  </div>
 
   <script src="vendor/qrcode.js"></script>
   <script src="app.js"></script>

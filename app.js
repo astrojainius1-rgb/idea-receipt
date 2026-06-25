@@ -38,6 +38,91 @@ function agoText(iso) {
   return { text, stale: mins >= STALE_MIN };
 }
 
+/* ---- user settings (persisted) ------------------------------------------- */
+const DEFAULT_SETTINGS = {
+  theme: "auto", sort: "default", sound: true, season: true, coupon: true,
+  notify: false, endpoint: "",
+};
+let settings = loadSettings();
+function loadSettings() {
+  try { return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(localStorage.getItem("settings") || "{}")); }
+  catch (e) { return Object.assign({}, DEFAULT_SETTINGS); }
+}
+function saveSettings() { localStorage.setItem("settings", JSON.stringify(settings)); }
+
+// "theme" is the user's choice (auto/light/dark); the <html data-theme> attribute
+// holds the *effective* value so the CSS only needs light/dark rules.
+const prefersLight = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
+function effectiveTheme() {
+  if (settings.theme === "light" || settings.theme === "dark") return settings.theme;
+  return prefersLight && prefersLight.matches ? "light" : "dark";
+}
+function applyTheme() { document.documentElement.dataset.theme = effectiveTheme(); }
+prefersLight?.addEventListener?.("change", () => { if (settings.theme === "auto") applyTheme(); });
+applyTheme();
+
+/* ---- crossing ideas off (persisted per idea, keyed by title) ------------- */
+const doneKey = (title) => "done:" + hash32(title);
+const isDone = (title) => localStorage.getItem(doneKey(title)) === "1";
+function toggleDone(title, el) {
+  const now = !isDone(title);
+  localStorage.setItem(doneKey(title), now ? "1" : "0");
+  el.classList.toggle("done", now);
+}
+
+/* ---- sorting ------------------------------------------------------------- */
+function sortItems(items) {
+  const arr = items.slice();
+  if (settings.sort === "new") arr.sort((a, b) => (Date.parse(b.added || "") || 0) - (Date.parse(a.added || "") || 0));
+  else if (settings.sort === "price") arr.sort((a, b) => ideaWords(b) * unitPrice(b.title) - ideaWords(a) * unitPrice(a.title));
+  else if (settings.sort === "az") arr.sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  return arr; // "default" keeps Notion order
+}
+
+/* ---- seasonal skin (auto by date) ---------------------------------------- */
+const SEASON_KEYS = ["xmas", "newyear", "valentine", "halloween", "spring", "summer"];
+function currentSeason() {
+  const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+  if (m === 12 && day >= 18) return { key: "xmas", badge: "🎄" };
+  if (m === 1 && day <= 2) return { key: "newyear", badge: "🎉" };
+  if (m === 2 && day >= 10 && day <= 15) return { key: "valentine", badge: "💘" };
+  if (m === 10 && day >= 25) return { key: "halloween", badge: "🎃" };
+  if ((m === 3 && day >= 15) || m === 4 || (m === 5 && day <= 15)) return { key: "spring", badge: "🌸" };
+  if (m >= 6 && m <= 8) return { key: "summer", badge: "☀️" };
+  return { key: "", badge: "" };
+}
+function applySeason() {
+  const r = $("#receipt");
+  if (!r) return;
+  const s = settings.season ? currentSeason() : { key: "", badge: "" };
+  SEASON_KEYS.forEach((k) => r.classList.remove("season-" + k));
+  if (s.key) r.classList.add("season-" + s.key);
+  const badge = $("#seasonBadge");
+  if (badge) badge.textContent = s.badge;
+}
+
+/* ---- coupon (compact, optional, seeded by the day) ----------------------- */
+function renderCoupon(when) {
+  const el = $("#coupon");
+  if (!el) return;
+  if (!settings.coupon) { el.hidden = true; return; }
+  el.hidden = false;
+  const pct = 5 + (parseInt(when.ymd, 10) % 3) * 5;      // 5 / 10 / 15% — stable per day
+  const code = "IDEA-" + when.ymd.slice(4) + when.hm;     // MMDDHHMM
+  el.textContent = `✁  SAVE ${pct}% ON YOUR NEXT IDEA  ·  ${code}`;
+}
+
+/* ---- lifetime tally (only bumped on a genuine print) --------------------- */
+function setLifetimeText(p) {
+  const el = $("#lifetime");
+  if (el) el.textContent = `${p} idea${p === 1 ? "" : "s"} printed here, all-time`;
+}
+function tallyLifetime(n) {
+  const printed = (parseInt(localStorage.getItem("lifetimePrinted") || "0", 10) || 0) + n;
+  localStorage.setItem("lifetimePrinted", String(printed));
+  setLifetimeText(printed);
+}
+
 /* ---- real metrics -------------------------------------------------------- */
 const wordsIn = (s) => (String(s || "").trim().match(/\S+/g) || []).length;
 function ideaWords(it) {
@@ -138,12 +223,14 @@ function render(data, animate) {
   $("#order").textContent = `ORDER #${when.ymd.slice(4)}-${when.hm}`;
   lastSyncIso = data.syncedAt;
   updateSyncedAgo();
+  applySeason();
 
+  const merged = mergePending(items); // include ideas added here, awaiting next sync
   const list = $("#items");
   list.innerHTML = "";
   let subtotal = 0, totalWords = 0;
 
-  items.forEach((it, i) => {
+  sortItems(merged).forEach((it, i) => {
     const title = (it.title || "Untitled idea").trim();
     const details = Array.isArray(it.details) ? it.details : [];
     const words = ideaWords(it);
@@ -154,6 +241,10 @@ function render(data, animate) {
 
     const row = document.createElement("div");
     row.className = "item";
+    if (isDone(title)) row.classList.add("done");
+    if (it.pending) row.classList.add("pending");
+    row.title = "tap to cross off";
+    row.addEventListener("click", () => toggleDone(title, row));
     row.style.setProperty("--i", animate ? i : 0);
 
     const line = document.createElement("div");
@@ -186,16 +277,17 @@ function render(data, animate) {
     const added = it.added ? stamp(it.added) : null;
     const qty = document.createElement("div");
     qty.className = "qty";
-    qty.textContent =
-      `${words} word${words === 1 ? "" : "s"} @ ${money(up)}${arrow}`
-      + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "")
-      + (added ? ` · ${added.date}` : "");
+    qty.textContent = it.pending
+      ? "sending to Notion — prints on next sync"
+      : `${words} word${words === 1 ? "" : "s"} @ ${money(up)}${arrow}`
+        + (pts ? ` · ${pts} note${pts === 1 ? "" : "s"}` : "")
+        + (added ? ` · ${added.date}` : "");
     row.appendChild(qty);
 
     list.appendChild(row);
   });
 
-  if (!items.length) {
+  if (!merged.length) {
     const empty = document.createElement("div");
     empty.className = "qty";
     empty.style.textAlign = "center";
@@ -203,7 +295,7 @@ function render(data, animate) {
     list.appendChild(empty);
   }
 
-  const count = items.length;
+  const count = merged.length;
   const tax = subtotal * 0.18; // 18% brain tax on the subtotal
   $("#t-count").textContent = count;
   $("#t-words").textContent = totalWords;
@@ -215,13 +307,13 @@ function render(data, animate) {
   $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
   sloganIdx++;
 
-  // lifetime tally of ideas printed on this device (every print adds the current batch)
-  const printed = (parseInt(localStorage.getItem("lifetimePrinted") || "0", 10) || 0) + count;
-  localStorage.setItem("lifetimePrinted", String(printed));
-  $("#lifetime").textContent = `${printed} idea${printed === 1 ? "" : "s"} printed here, all-time`;
+  renderCoupon(when);
+  tallyLifetime(count); // bump the all-time printed count and update the footer line
 
   const url = data.docUrl || location.href;
   buildCode(url);
+  const notion = $("#notion");
+  if (notion) notion.href = url;
   $("#barnum").textContent = group4(serial(when.ymd, count, totalWords));
   let host = "this receipt";
   try { host = new URL(url).host.replace(/^www\./, ""); } catch (e) {}
@@ -240,9 +332,11 @@ async function pull(initial) {
     const res = await fetch("data.json?ts=" + Date.now(), { cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
+    lastData = data;
     const sig = JSON.stringify(data);
     if (sig === lastSig) return; // nothing changed
     lastSig = sig;
+    reconcileIdeas(data, initial); // clear synced pending ideas + alert on new ones
     render(data, !initial); // animate only on later refreshes; initial uses the CSS feed-in
     if (initial) {
       $("#items").querySelectorAll(".item").forEach((el, i) => el.style.setProperty("--i", i));
@@ -366,6 +460,117 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
+/* ---- adding ideas + live pending state ----------------------------------- */
+let lastData = null;
+const pendingIdeas = new Set(loadPending());
+function loadPending() { try { return JSON.parse(localStorage.getItem("pendingIdeas") || "[]"); } catch (e) { return []; } }
+function savePending() { localStorage.setItem("pendingIdeas", JSON.stringify([...pendingIdeas])); }
+
+// fold ideas added here (but not yet synced back from Notion) into the rendered list
+function mergePending(items) {
+  const have = new Set(items.map((it) => (it.title || "").trim()));
+  const extra = [...pendingIdeas]
+    .filter((t) => !have.has(t))
+    .map((t) => ({ title: t, details: [], added: new Date().toISOString(), pending: true }));
+  return items.concat(extra);
+}
+function rerender() { if (lastData) render(lastData, false); }
+
+// drop pending ideas that have now landed in Notion; alert on genuinely new ideas
+function reconcileIdeas(data, initial) {
+  const titles = new Set((data.items || []).map((it) => (it.title || "").trim()).filter(Boolean));
+  let changed = false;
+  for (const t of [...pendingIdeas]) if (titles.has(t)) { pendingIdeas.delete(t); changed = true; }
+  if (changed) savePending();
+
+  const known = getKnownTitles();
+  if (known.size && !initial && settings.notify && "Notification" in window && Notification.permission === "granted") {
+    const fresh = [...titles].filter((t) => !known.has(t));
+    if (fresh.length) notify(`🧾 ${fresh.length} fresh idea${fresh.length > 1 ? "s" : ""} printed`, fresh.slice(0, 4).join(" · "));
+  }
+  setKnownTitles(titles);
+}
+function getKnownTitles() { try { return new Set(JSON.parse(localStorage.getItem("knownTitles") || "[]")); } catch (e) { return new Set(); } }
+function setKnownTitles(set) { localStorage.setItem("knownTitles", JSON.stringify([...set])); }
+
+async function notify(title, body) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const reg = navigator.serviceWorker && (await navigator.serviceWorker.getRegistration());
+    if (reg && reg.showNotification) reg.showNotification(title, { body, icon: "icon.png", badge: "icon.png", tag: "idea" });
+    else new Notification(title, { body, icon: "icon.png" });
+  } catch (e) { /* notifications unsupported — ignore */ }
+}
+
+function flashAdd(msg) {
+  const el = $("#addNote");
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(flashAdd._t);
+  flashAdd._t = setTimeout(() => { el.hidden = true; }, 3800);
+}
+
+// POST the new idea to the user's Notion-writer worker; show it as "pending" until it syncs
+async function addIdea() {
+  const input = $("#ideaInput");
+  const title = (input?.value || "").trim();
+  if (!title) return;
+  const ep = (settings.endpoint || "").trim();
+  if (!ep) { flashAdd("set your add-idea sync URL in ⚙ settings first"); openSheet(); return; }
+  const btn = $("#addIdea");
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+  try {
+    const res = await fetch(ep, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    pendingIdeas.add(title);
+    savePending();
+    if (input) input.value = "";
+    rerender();
+    flashAdd("added ✓ — it'll print on the next Notion sync");
+  } catch (e) {
+    console.error("addIdea failed", e);
+    flashAdd("couldn't reach your sync URL — check ⚙ settings");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "add"; }
+  }
+}
+$("#addForm")?.addEventListener("submit", (e) => { e.preventDefault(); addIdea(); });
+
+/* ---- settings sheet ------------------------------------------------------ */
+function openSheet() { syncSheet(); $("#sheet").hidden = false; }
+function closeSheet() { $("#sheet").hidden = true; }
+function syncSheet() {
+  const set = (id, prop, val) => { const el = $(id); if (el) el[prop] = val; };
+  set("#setTheme", "value", settings.theme);
+  set("#setSort", "value", settings.sort);
+  set("#setSound", "checked", settings.sound);
+  set("#setSeason", "checked", settings.season);
+  set("#setCoupon", "checked", settings.coupon);
+  set("#setNotify", "checked", settings.notify);
+  set("#setEndpoint", "value", settings.endpoint || "");
+}
+$("#gear")?.addEventListener("click", openSheet);
+$("#sheetClose")?.addEventListener("click", closeSheet);
+$("#sheet")?.addEventListener("click", (e) => { if (e.target.id === "sheet") closeSheet(); });
+
+$("#setTheme")?.addEventListener("change", (e) => { settings.theme = e.target.value; saveSettings(); applyTheme(); });
+$("#setSort")?.addEventListener("change", (e) => { settings.sort = e.target.value; saveSettings(); rerender(); });
+$("#setSound")?.addEventListener("change", (e) => { settings.sound = e.target.checked; saveSettings(); });
+$("#setSeason")?.addEventListener("change", (e) => { settings.season = e.target.checked; saveSettings(); applySeason(); });
+$("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.checked; saveSettings(); rerender(); });
+$("#setEndpoint")?.addEventListener("change", (e) => { settings.endpoint = e.target.value.trim(); saveSettings(); });
+$("#setNotify")?.addEventListener("change", async (e) => {
+  if (e.target.checked) {
+    if (!("Notification" in window)) { flashAdd("notifications aren't supported here"); e.target.checked = false; return; }
+    let perm = Notification.permission;
+    if (perm !== "granted") perm = await Notification.requestPermission();
+    if (perm !== "granted") { e.target.checked = false; settings.notify = false; saveSettings(); flashAdd("notification permission was denied"); return; }
+  }
+  settings.notify = e.target.checked;
+  saveSettings();
+});
+
 pull(true);
 setInterval(() => pull(false), POLL_MS);
 
@@ -385,54 +590,59 @@ function getCtx() {
   } catch (e) { return null; }
 }
 
-// A real-printer feel: a wobbling motor hum + ratchety head grains whose timing,
-// loudness and pitch vary, with occasional carriage-return pauses between "lines".
+// Dot-matrix / receipt-printer feel: a steady stepper-motor whine underneath, with the
+// head printing line-by-line — each line a rapid buzz, separated by short paper-feed gaps.
 function playPrintSound(ms) {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
   const dur = ms / 1000;
+  const out = ctx.createGain(); out.gain.value = 0.9; out.connect(ctx.destination);
 
-  // motor hum underneath, speed wobbling slightly
-  const motor = ctx.createOscillator(); motor.type = "sawtooth";
-  const motorGain = ctx.createGain();
-  const motorLp = ctx.createBiquadFilter(); motorLp.type = "lowpass"; motorLp.frequency.value = 240;
-  motorGain.gain.setValueAtTime(0.0001, t0);
-  motorGain.gain.linearRampToValueAtTime(0.035, t0 + 0.1);
-  let mt = 0;
-  while (mt < dur) {
-    motor.frequency.setValueAtTime(50 + Math.random() * 16, t0 + mt);
-    mt += 0.07 + Math.random() * 0.07;
-  }
-  motorGain.gain.setValueAtTime(0.035, t0 + Math.max(0, dur - 0.12));
-  motorGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  motor.connect(motorLp).connect(motorGain).connect(ctx.destination);
-  motor.start(t0); motor.stop(t0 + dur);
+  // 1) stepper-motor whine — a steady high tone with light vibrato (the constant "eeee")
+  const whine = ctx.createOscillator(); whine.type = "square"; whine.frequency.value = 168;
+  const whineLp = ctx.createBiquadFilter(); whineLp.type = "lowpass"; whineLp.frequency.value = 1500;
+  const whineGain = ctx.createGain(); whineGain.gain.value = 0.011;
+  const vib = ctx.createOscillator(); vib.type = "sine"; vib.frequency.value = 7.5;
+  const vibAmt = ctx.createGain(); vibAmt.gain.value = 9;
+  vib.connect(vibAmt).connect(whine.frequency);
+  whine.connect(whineLp).connect(whineGain).connect(out);
+  whine.start(t0); whine.stop(t0 + dur); vib.start(t0); vib.stop(t0 + dur);
 
-  // ratchety print head: bursts of filtered noise, jittered in time/level/pitch
+  // 2) gritty noise bed, gated per line for the paper/ink texture
   const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
-  const ch = buf.getChannelData(0);
-  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t0);
+  const nd = buf.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource(); noise.buffer = buf;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 0.9; bp.frequency.value = 1700;
+  const nGain = ctx.createGain(); nGain.gain.setValueAtTime(0.0001, t0);
+  noise.connect(bp).connect(nGain).connect(out);
+  noise.start(t0); noise.stop(t0 + dur);
 
-  let t = 0, line = 0;
-  const lineLen = 7 + Math.floor(Math.random() * 7);
+  // 3) buzzy square "head" that prints each line — pitch shifts slightly line to line
+  const head = ctx.createOscillator(); head.type = "square"; head.frequency.value = 110;
+  const headBp = ctx.createBiquadFilter(); headBp.type = "bandpass"; headBp.Q.value = 0.7; headBp.frequency.value = 1400;
+  const hGain = ctx.createGain(); hGain.gain.setValueAtTime(0.0001, t0);
+  head.connect(headBp).connect(hGain).connect(out);
+  head.start(t0); head.stop(t0 + dur);
+
+  // schedule the print line-by-line: a dense buzz, then a brief feed gap
+  let t = 0;
   while (t < dur) {
-    const onset = t0 + t;
-    const len = 0.016 + Math.random() * 0.03;     // burst length varies
-    const amp = 0.05 + Math.random() * 0.13;       // loudness varies
-    gain.gain.setValueAtTime(amp, onset);
-    gain.gain.exponentialRampToValueAtTime(0.008, onset + len * 0.75);
-    bp.frequency.setValueAtTime(850 + Math.random() * 2300, onset); // pitch/timbre varies
-    t += len + 0.004 + Math.random() * 0.01;
-    if (++line % lineLen === 0) t += 0.07 + Math.random() * 0.1;     // carriage-return pause
+    const lineDur = 0.06 + Math.random() * 0.07;   // how long this line takes to print
+    const gap = 0.018 + Math.random() * 0.03;       // paper-feed pause between lines
+    const on = t0 + t;
+    const off = t0 + Math.min(dur, t + lineDur);
+    const lvl = 0.05 + Math.random() * 0.05;
+    head.frequency.setValueAtTime(95 + Math.random() * 50, on); // each line buzzes at a slightly different pitch
+    hGain.gain.setValueAtTime(lvl, on);
+    hGain.gain.setValueAtTime(lvl, Math.max(on, off - 0.006));
+    hGain.gain.linearRampToValueAtTime(0.0001, off);            // sharp cut at line end
+    nGain.gain.setValueAtTime(0.04 + Math.random() * 0.03, on);
+    bp.frequency.setValueAtTime(1400 + Math.random() * 900, on);
+    nGain.gain.linearRampToValueAtTime(0.0001, off);
+    t += lineDur + gap;
   }
-  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(bp).connect(gain).connect(ctx.destination);
-  src.start(t0); src.stop(t0 + dur);
 }
 
 // A struck desk/service bell: bright metallic strike + inharmonic partials that ring out.
@@ -469,7 +679,8 @@ function playDing() {
 
 function printFx() {
   try {
-    playPrintSound(PRINT_MS - 140);
+    // print noise runs for the feed, then stops ~0.3s before the bell so the ding lands clean
+    if (settings.sound) playPrintSound(PRINT_MS - 300);
     if (navigator.vibrate) {
       const pat = [];
       let total = 0;
@@ -482,7 +693,8 @@ function printFx() {
       pat.push(90); // final thunk
       navigator.vibrate(pat);
     }
-    setTimeout(() => { playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS - 40);
+    // the bell rings once the whole bill has printed out (after the print-out animation finishes)
+    setTimeout(() => { if (settings.sound) playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS + 60);
   } catch (e) { /* audio/haptics unsupported — ignore */ }
 }
 
@@ -498,7 +710,7 @@ async function triggerRefresh() {
   await pull(false);
   setTimeout(() => {
     refreshing = false;
-    if (btn) { btn.classList.remove("busy"); btn.textContent = "↻ reprint receipt"; }
+    if (btn) { btn.classList.remove("busy"); btn.textContent = "↻ reprint"; }
   }, PRINT_MS);
 }
 $("#reprint")?.addEventListener("click", triggerRefresh);
