@@ -566,54 +566,42 @@ function getCtx() {
   } catch (e) { return null; }
 }
 
-// A real-printer feel: a wobbling motor hum + ratchety head grains whose timing,
-// loudness and pitch vary, with occasional carriage-return pauses between "lines".
+// A smooth thermal-printer feed: a soft pitched motor buzz (sawtooth through a bandpass)
+// with a gentle pitch wobble and a steady tremolo for the mechanical "vvvvv" — no harsh
+// random noise bursts. Eases in and out so it never clicks.
 function playPrintSound(ms) {
   const ctx = getCtx();
   if (!ctx) return;
   const t0 = ctx.currentTime;
   const dur = ms / 1000;
 
-  // motor hum underneath, speed wobbling slightly
-  const motor = ctx.createOscillator(); motor.type = "sawtooth";
-  const motorGain = ctx.createGain();
-  const motorLp = ctx.createBiquadFilter(); motorLp.type = "lowpass"; motorLp.frequency.value = 240;
-  motorGain.gain.setValueAtTime(0.0001, t0);
-  motorGain.gain.linearRampToValueAtTime(0.035, t0 + 0.1);
-  let mt = 0;
-  while (mt < dur) {
-    motor.frequency.setValueAtTime(50 + Math.random() * 16, t0 + mt);
-    mt += 0.07 + Math.random() * 0.07;
-  }
-  motorGain.gain.setValueAtTime(0.035, t0 + Math.max(0, dur - 0.12));
-  motorGain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  motor.connect(motorLp).connect(motorGain).connect(ctx.destination);
-  motor.start(t0); motor.stop(t0 + dur);
+  // master envelope (keeps the level gentle and fades cleanly at both ends)
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, t0);
+  master.gain.linearRampToValueAtTime(0.05, t0 + 0.08);
+  master.gain.setValueAtTime(0.05, t0 + Math.max(0.08, dur - 0.1));
+  master.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  master.connect(ctx.destination);
 
-  // ratchety print head: bursts of filtered noise, jittered in time/level/pitch
-  const buf = ctx.createBuffer(1, Math.max(1, Math.ceil(ctx.sampleRate * dur)), ctx.sampleRate);
-  const ch = buf.getChannelData(0);
-  for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
-  const src = ctx.createBufferSource(); src.buffer = buf;
-  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.2;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, t0);
+  // the feed tone: a sawtooth narrowed by a bandpass = a buzzy little motor
+  const osc = ctx.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = 110;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1200; bp.Q.value = 5;
 
-  let t = 0, line = 0;
-  const lineLen = 7 + Math.floor(Math.random() * 7);
-  while (t < dur) {
-    const onset = t0 + t;
-    const len = 0.016 + Math.random() * 0.03;     // burst length varies
-    const amp = 0.05 + Math.random() * 0.13;       // loudness varies
-    gain.gain.setValueAtTime(amp, onset);
-    gain.gain.exponentialRampToValueAtTime(0.008, onset + len * 0.75);
-    bp.frequency.setValueAtTime(850 + Math.random() * 2300, onset); // pitch/timbre varies
-    t += len + 0.004 + Math.random() * 0.01;
-    if (++line % lineLen === 0) t += 0.07 + Math.random() * 0.1;     // carriage-return pause
-  }
-  gain.gain.linearRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(bp).connect(gain).connect(ctx.destination);
-  src.start(t0); src.stop(t0 + dur);
+  // slow wobble so the motor isn't perfectly static
+  const wob = ctx.createOscillator(); wob.type = "sine"; wob.frequency.value = 5;
+  const wobAmt = ctx.createGain(); wobAmt.gain.value = 5;
+  wob.connect(wobAmt).connect(osc.frequency);
+
+  // tremolo: fast AM gives the ratchety stepper feed, but smoothly (0.4–1.0 @ ~30Hz)
+  const trem = ctx.createGain(); trem.gain.value = 0.7;
+  const lfo = ctx.createOscillator(); lfo.type = "square"; lfo.frequency.value = 30;
+  const lfoDepth = ctx.createGain(); lfoDepth.gain.value = 0.3;
+  lfo.connect(lfoDepth).connect(trem.gain);
+
+  osc.connect(bp).connect(trem).connect(master);
+  osc.start(t0); osc.stop(t0 + dur);
+  wob.start(t0); wob.stop(t0 + dur);
+  lfo.start(t0); lfo.stop(t0 + dur);
 }
 
 // A struck desk/service bell: bright metallic strike + inharmonic partials that ring out.

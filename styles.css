@@ -318,8 +318,7 @@ body {
 .coupon[hidden] { display: none; }
 .coupon.redeemed {
   background: #ffe14d;
-  border-style: solid;
-  border-color: #d9b400;
+  border-color: transparent; /* no border once redeemed */
   color: #20242b;
 }
 
@@ -489,7 +488,7 @@ body {
 .jot-btn {
   display: block;
   width: 100%;
-  margin: 16px 0 0;
+  margin: 28px 0 0; /* extra top to offset the receipt's torn bottom edge, so gaps look even */
   font-family: var(--mono);
   font-size: 13px;
   color: var(--ink-soft);
