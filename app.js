@@ -101,7 +101,7 @@ function applySeason(forceKey) {
   SEASON_KEYS.forEach((k) => r.classList.remove("season-" + k));
   if (s.key) r.classList.add("season-" + s.key);
   const badge = $("#seasonBadge");
-  if (badge) badge.textContent = s.badge;
+  if (badge) badge.innerHTML = s.key ? (SEASON_BADGE_SVG[s.key] || "") : "";
   buildSeasonFx(s.key);
 }
 const BADGES = { spring: "🌸", summer: "☀️", monsoon: "🌧️", winter: "❄️" };
@@ -120,6 +120,42 @@ const FLOWER_COLORS = [
   ["#e87aa6", "#f6d743"], ["#f0ebed", "#f3b34a"],
   ["#b79be0", "#f6d743"], ["#ef9a76", "#f6d743"],
 ];
+
+// little drawn (non-emoji) leaf, rotated by `angle`, with a midrib
+function leafSVG(color, angle) {
+  return (
+    `<svg viewBox="0 0 24 24"><g transform="rotate(${angle} 12 12)">` +
+    `<path d="M12 2 C19 6 19 17 12 22 C5 17 5 6 12 2 Z" fill="${color}"/>` +
+    `<path d="M12 4 L12 20" stroke="rgba(0,0,0,0.22)" stroke-width="1" fill="none"/>` +
+    `</g></svg>`
+  );
+}
+const LEAF_COLORS = ["#6aa84f", "#4e8a36", "#79b34a", "#8bbf5a"];
+
+// drawn (non-emoji) season "logos" used for the corner badge
+const SEASON_BADGE_SVG = {
+  spring: flowerSVG("#e87aa6", "#f6d743"),
+  summer:
+    `<svg viewBox="0 0 24 24"><g stroke="#e8a200" stroke-width="2" stroke-linecap="round">` +
+    `<line x1="12" y1="12" x2="23" y2="12"/><line x1="12" y1="12" x2="19.8" y2="4.2"/>` +
+    `<line x1="12" y1="12" x2="12" y2="1"/><line x1="12" y1="12" x2="4.2" y2="4.2"/>` +
+    `<line x1="12" y1="12" x2="1" y2="12"/><line x1="12" y1="12" x2="4.2" y2="19.8"/>` +
+    `<line x1="12" y1="12" x2="12" y2="23"/><line x1="12" y1="12" x2="19.8" y2="19.8"/></g>` +
+    `<circle cx="12" cy="12" r="5" fill="#f5b505"/></svg>`,
+  monsoon:
+    `<svg viewBox="0 0 24 24"><g fill="#5b6b80">` +
+    `<circle cx="8" cy="11" r="4"/><circle cx="14" cy="9" r="5"/>` +
+    `<circle cx="17.5" cy="12" r="3.5"/><rect x="7" y="11" width="11.5" height="4" rx="2"/></g>` +
+    `<g stroke="#3c7d9e" stroke-width="1.7" stroke-linecap="round">` +
+    `<line x1="8" y1="17" x2="6.8" y2="21"/><line x1="12" y1="17" x2="10.8" y2="21.5"/>` +
+    `<line x1="16" y1="17" x2="14.8" y2="21"/></g></svg>`,
+  winter:
+    `<svg viewBox="0 0 24 24"><g stroke="#5566a0" stroke-width="1.6" stroke-linecap="round">` +
+    `<line x1="12" y1="2" x2="12" y2="22"/><line x1="3.3" y1="7" x2="20.7" y2="17"/>` +
+    `<line x1="3.3" y1="17" x2="20.7" y2="7"/>` +
+    `<line x1="12" y1="5" x2="9.5" y2="3"/><line x1="12" y1="5" x2="14.5" y2="3"/>` +
+    `<line x1="12" y1="19" x2="9.5" y2="21"/><line x1="12" y1="19" x2="14.5" y2="21"/></g></svg>`,
+};
 
 // a drawn (non-emoji) bee: striped body, head, wings, antennae — faces right (flies right)
 const BEE_SVG =
@@ -156,21 +192,31 @@ function buildSeasonFx(key) {
 
   if (key === "spring") {
     ["top", "bottom"].forEach((edge) => {
-      for (let i = 0; i < 7; i++) {
-        const fl = document.createElement("span");
-        fl.className = "bloom " + edge;
-        const [petal, centre] = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
-        fl.innerHTML = flowerSVG(petal, centre);
-        const sz = rnd(13, 20);
-        fl.style.left = rnd(2, 94) + "%";
-        fl.style.width = sz + "px";
-        fl.style.height = sz + "px";
-        fl.style.animationDuration = rnd(2.6, 5) + "s";
-        fl.style.animationDelay = -rnd(0, 3) + "s";
-        fx.appendChild(fl);
-      }
+      // a mix of flowers (most) and leaves, scattered along the edge
+      const kinds = [];
+      for (let i = 0; i < 11; i++) kinds.push("flower");
+      for (let i = 0; i < 6; i++) kinds.push("leaf");
+      kinds.forEach((kind) => {
+        const el = document.createElement("span");
+        el.className = "bloom " + edge;
+        if (kind === "flower") {
+          const [petal, centre] = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+          el.innerHTML = flowerSVG(petal, centre);
+          const sz = rnd(13, 20);
+          el.style.width = sz + "px"; el.style.height = sz + "px";
+        } else {
+          const g = LEAF_COLORS[Math.floor(Math.random() * LEAF_COLORS.length)];
+          el.innerHTML = leafSVG(g, Math.floor(rnd(-65, 65)));
+          const sz = rnd(12, 18);
+          el.style.width = sz + "px"; el.style.height = sz + "px";
+        }
+        el.style.left = rnd(1, 95) + "%";
+        el.style.animationDuration = rnd(2.6, 5) + "s";
+        el.style.animationDelay = -rnd(0, 3) + "s";
+        fx.appendChild(el);
+      });
     });
-    // a bee drifts across the receipt (in the layer above the text)
+    // a bee drifts across the top of the receipt (in the layer above the text)
     if (fxTop) {
       const bee = document.createElement("div");
       bee.className = "bee";
