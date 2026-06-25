@@ -79,16 +79,15 @@ function sortItems(items) {
 }
 
 /* ---- seasonal skin (auto by date) ---------------------------------------- */
-const SEASON_KEYS = ["xmas", "newyear", "valentine", "halloween", "spring", "summer"];
+// four seasons by month: spring (Mar–Apr), summer (May–Jun), monsoon (Jul–Sep),
+// winter (Oct–Feb). Always on (toggleable).
+const SEASON_KEYS = ["spring", "summer", "monsoon", "winter"];
 function currentSeason() {
-  const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
-  if (m === 12 && day >= 18) return { key: "xmas", badge: "🎄" };
-  if (m === 1 && day <= 2) return { key: "newyear", badge: "🎉" };
-  if (m === 2 && day >= 10 && day <= 15) return { key: "valentine", badge: "💘" };
-  if (m === 10 && day >= 25) return { key: "halloween", badge: "🎃" };
-  if ((m === 3 && day >= 15) || m === 4 || (m === 5 && day <= 15)) return { key: "spring", badge: "🌸" };
-  if (m >= 6 && m <= 8) return { key: "summer", badge: "☀️" };
-  return { key: "", badge: "" };
+  const m = new Date().getMonth() + 1;
+  if (m === 3 || m === 4) return { key: "spring", badge: "🌸" };
+  if (m === 5 || m === 6) return { key: "summer", badge: "☀️" };
+  if (m >= 7 && m <= 9) return { key: "monsoon", badge: "🌧️" };
+  return { key: "winter", badge: "❄️" };
 }
 function applySeason() {
   const r = $("#receipt");

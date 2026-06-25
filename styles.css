@@ -459,12 +459,32 @@ body {
   z-index: 3;
   pointer-events: none;
 }
-.receipt.season-xmas      { --rule: #2f6b3a; background-color: #f4f7f3; }
-.receipt.season-newyear   { --rule: #a6852c; background-color: #f8f6ef; }
-.receipt.season-valentine { --rule: #c2557a; background-color: #faf2f4; }
-.receipt.season-halloween { --rule: #b5611f; background-color: #f8f3ec; }
-.receipt.season-spring    { --rule: #5a8f4e; background-color: #f5f8f2; }
-.receipt.season-summer    { --rule: #c0892a; background-color: #faf7ee; }
+/* each season retints the paper, the dashed rules (--rule) and the soft text
+   (--ink-soft), and adds a coloured wash across the top of the receipt */
+.receipt.season-spring {
+  --paper: #edf6e4; --rule: #4f8a36; --ink-soft: #587a48;
+  background-image:
+    radial-gradient(130% 70% at 50% 0%, rgba(226,150,185,0.30) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.014) 0 2px, transparent 2px 4px);
+}
+.receipt.season-summer {
+  --paper: #fdf1d4; --rule: #d6850f; --ink-soft: #8a6526;
+  background-image:
+    radial-gradient(130% 70% at 50% 0%, rgba(246,176,52,0.34) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.014) 0 2px, transparent 2px 4px);
+}
+.receipt.season-monsoon {
+  --paper: #e7eff3; --rule: #2c728f; --ink-soft: #466373;
+  background-image:
+    radial-gradient(130% 70% at 50% 0%, rgba(60,125,158,0.32) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.014) 0 2px, transparent 2px 4px);
+}
+.receipt.season-winter {
+  --paper: #e9edf6; --rule: #5160a0; --ink-soft: #586182;
+  background-image:
+    radial-gradient(130% 70% at 50% 0%, rgba(118,138,202,0.30) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.014) 0 2px, transparent 2px 4px);
+}
 
 /* ---- gear / settings button ---- */
 .gear {
