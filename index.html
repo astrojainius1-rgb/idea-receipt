@@ -117,6 +117,15 @@
       </div>
       <label class="set-row"><span>Coupon</span><input type="checkbox" id="setCoupon" /></label>
       <label class="set-row"><span>New-idea alerts</span><input type="checkbox" id="setNotify" /></label>
+      <button class="stats-btn" id="statsBtn" type="button">📊 Stats &amp; past receipts</button>
+    </div>
+  </div>
+
+  <!-- stats & past receipts -->
+  <div class="sheet" id="statsSheet" hidden>
+    <div class="sheet-card" role="dialog" aria-label="Stats" aria-modal="true">
+      <div class="sheet-head"><span>STATS &amp; PAST RECEIPTS</span><button class="sheet-x" id="statsClose" type="button" aria-label="close">&#10005;</button></div>
+      <div id="statsBody"></div>
     </div>
   </div>
 

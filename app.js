@@ -308,15 +308,62 @@ $("#coupon")?.addEventListener("click", () => {
   setCouponState(el, redeemed);
 });
 
-/* ---- lifetime tally (only bumped on a genuine print) --------------------- */
+/* ---- lifetime tally: count DISTINCT ideas ever seen on this device --------
+   (the old version added the item count on every render, so it inflated each time
+   the app was reopened — this counts unique titles, which is stable and honest.) */
+const MILESTONES = [5, 10, 25, 50, 100, 250, 500, 1000];
+function lifetimeIdeasSet() {
+  try { return new Set(JSON.parse(localStorage.getItem("lifetimeIdeas") || "[]")); }
+  catch (e) { return new Set(); }
+}
 function setLifetimeText(p) {
   const el = $("#lifetime");
   if (el) el.textContent = `${p} idea${p === 1 ? "" : "s"} printed here, all-time`;
 }
-function tallyLifetime(n) {
-  const printed = (parseInt(localStorage.getItem("lifetimePrinted") || "0", 10) || 0) + n;
-  localStorage.setItem("lifetimePrinted", String(printed));
-  setLifetimeText(printed);
+function tallyLifetime(titles) {
+  const set = lifetimeIdeasSet();
+  const before = set.size;
+  titles.forEach((t) => { const x = String(t || "").trim(); if (x) set.add(x); });
+  const after = set.size;
+  if (after !== before) localStorage.setItem("lifetimeIdeas", JSON.stringify([...set]));
+  setLifetimeText(after);
+  const crossed = MILESTONES.find((m) => before < m && after >= m);
+  if (crossed) milestoneFlourish(crossed);
+}
+
+/* ---- past receipts (one snapshot per day) -------------------------------- */
+function loadHistory() { try { return JSON.parse(localStorage.getItem("history") || "[]"); } catch (e) { return []; } }
+function recordHistory(when, count, words, grand) {
+  if (when.ymd === "00000000") return;
+  const hist = loadHistory();
+  const row = { ymd: when.ymd, date: when.date, count, words, grand: Math.round(grand * 100) / 100 };
+  const i = hist.findIndex((h) => h.ymd === when.ymd);
+  if (i >= 0) hist[i] = row; else hist.push(row);
+  hist.sort((a, b) => a.ymd.localeCompare(b.ymd));
+  while (hist.length > 90) hist.shift();
+  localStorage.setItem("history", JSON.stringify(hist));
+}
+
+/* ---- milestone flourish: confetti when the lifetime count crosses a mark -- */
+function milestoneFlourish(n) {
+  const layer = document.createElement("div");
+  layer.className = "confetti";
+  const colors = ["#e87aa6", "#f6d743", "#5a8f4e", "#3c7d9e", "#d97757", "#b79be0"];
+  for (let i = 0; i < 70; i++) {
+    const p = document.createElement("i");
+    p.style.left = Math.random() * 100 + "%";
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (1.6 + Math.random() * 1.6) + "s";
+    p.style.animationDelay = (Math.random() * 0.5) + "s";
+    p.style.setProperty("--rot", Math.floor(Math.random() * 360) + "deg");
+    layer.appendChild(p);
+  }
+  const toast = document.createElement("div");
+  toast.className = "confetti-toast";
+  toast.textContent = `🎉 ${n} ideas printed!`;
+  layer.appendChild(toast);
+  document.body.appendChild(layer);
+  setTimeout(() => layer.remove(), 3600);
 }
 
 /* ---- real metrics -------------------------------------------------------- */
@@ -425,15 +472,19 @@ function render(data, animate) {
   const list = $("#items");
   list.innerHTML = "";
   let subtotal = 0, totalWords = 0;
+  const titles = [];
 
   sortItems(merged).forEach((it, i) => {
     const title = (it.title || "Untitled idea").trim();
     const details = Array.isArray(it.details) ? it.details : [];
+    const tags = Array.isArray(it.tags) ? it.tags : [];
     const words = ideaWords(it);
     const up = unitPrice(title);          // this idea's market rate per word
     const amt = words * up;               // price = words × this idea's going rate
     subtotal += amt;
     totalWords += words;
+    titles.push(title);
+    const isNew = !it.pending && it.added && (Date.now() - Date.parse(it.added)) < 48 * 3600 * 1000;
 
     const row = document.createElement("div");
     row.className = "item";
@@ -448,13 +499,32 @@ function render(data, animate) {
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = title;
+    line.appendChild(name);
+    if (isNew) {
+      const stamp = document.createElement("span");
+      stamp.className = "new-stamp";
+      stamp.textContent = "NEW";
+      line.appendChild(stamp);
+    }
     const dots = document.createElement("span");
     dots.className = "dots";
     const amtEl = document.createElement("span");
     amtEl.className = "amt";
     amtEl.textContent = money(amt);
-    line.append(name, dots, amtEl);
+    line.append(dots, amtEl);
     row.appendChild(line);
+
+    if (tags.length) {
+      const tagRow = document.createElement("div");
+      tagRow.className = "tags";
+      tags.forEach((t) => {
+        const chip = document.createElement("span");
+        chip.className = "tag";
+        chip.textContent = "#" + String(t).trim();
+        tagRow.appendChild(chip);
+      });
+      row.appendChild(tagRow);
+    }
 
     if (details.length) {
       const det = document.createElement("div");
@@ -504,7 +574,8 @@ function render(data, animate) {
   sloganIdx++;
 
   renderCoupon(when);
-  tallyLifetime(count); // bump the all-time printed count and update the footer line
+  tallyLifetime(titles); // unique-ideas-ever counter (+ milestone flourish)
+  recordHistory(when, count, totalWords, subtotal + tax); // snapshot for the stats view
 
   const url = data.docUrl || location.href;
   buildCode(url);
@@ -732,12 +803,60 @@ $("#setNotify")?.addEventListener("change", async (e) => {
   saveSettings();
 });
 
-pull(true);
-setInterval(() => pull(false), POLL_MS);
+/* ---- stats & past receipts modal ----------------------------------------- */
+function openStats() { buildStats(); $("#statsSheet").hidden = false; }
+function closeStats() { $("#statsSheet").hidden = true; }
+function buildStats() {
+  const body = $("#statsBody");
+  if (!body) return;
+  const life = lifetimeIdeasSet().size;
+  const hist = loadHistory();
+  const items = (lastData && lastData.items) || [];
+  let top = null;
+  let grand = 0;
+  items.forEach((it) => {
+    const t = (it.title || "").trim();
+    const v = ideaWords(it) * unitPrice(t);
+    grand += v;
+    if (!top || v > top.v) top = { t, v };
+  });
+  grand *= 1.18;
+  const biggest = hist.reduce((m, h) => (h.count > m ? h.count : m), 0);
+  const stat = (label, val) => `<div class="stat"><span>${label}</span><strong>${val}</strong></div>`;
+  let grid = "";
+  grid += stat("Ideas all-time", life);
+  grid += stat("On the receipt now", items.length);
+  grid += stat("Current total", money(grand));
+  grid += stat("Biggest day", biggest + " idea" + (biggest === 1 ? "" : "s"));
+  grid += stat("Receipts logged", hist.length);
+  if (top) grid += stat("Priciest idea", `${top.t} — ${money(top.v)}`);
+  const rows = hist.slice(-14).reverse().map((h) =>
+    `<div class="hist-row"><span>${h.date}</span><span>${h.count} idea${h.count === 1 ? "" : "s"}</span><span>${money(h.grand)}</span></div>`
+  ).join("") || `<div class="hist-empty">no past receipts logged yet</div>`;
+  body.innerHTML = `<div class="stat-grid">${grid}</div><div class="hist-head">PAST RECEIPTS</div><div class="hist-list">${rows}</div>`;
+}
+$("#statsBtn")?.addEventListener("click", () => { closeSheet(); openStats(); });
+$("#statsClose")?.addEventListener("click", closeStats);
+$("#statsSheet")?.addEventListener("click", (e) => { if (e.target.id === "statsSheet") closeStats(); });
 
-// pull fresh when the page is reopened / refocused on phone
+/* ---- audio unlock: resume the context on any user interaction (esp. iOS) -- */
+function unlockAudio() { const c = getCtx(); if (c && c.state === "suspended") c.resume(); }
+["pointerdown", "touchend", "click"].forEach((ev) => window.addEventListener(ev, unlockAudio, { passive: true }));
+
+pull(true);
+let pollTimer = setInterval(() => pull(false), POLL_MS);
+
+// battery: while the app is hidden, stop polling AND pause the looping animations
+// (seasonal weather, bee); resume + refetch when it comes back to the foreground.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") pull(false);
+  const hidden = document.visibilityState !== "visible";
+  document.body.classList.toggle("paused", hidden);
+  if (hidden) {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  } else {
+    pull(false);
+    if (!pollTimer) pollTimer = setInterval(() => pull(false), POLL_MS);
+  }
 });
 
 /* ---- printer sound + bing + haptics -------------------------------------- */
@@ -766,8 +885,8 @@ function playPrintSound(ms) {
   // shared master with clean in/out fades so it never clicks
   const master = ctx.createGain();
   master.gain.setValueAtTime(0.0001, t0);
-  master.gain.exponentialRampToValueAtTime(0.06, t0 + 0.06);
-  master.gain.setValueAtTime(0.06, Math.max(t0 + 0.06, end - 0.08));
+  master.gain.exponentialRampToValueAtTime(0.13, t0 + 0.06);
+  master.gain.setValueAtTime(0.13, Math.max(t0 + 0.06, end - 0.08));
   master.gain.exponentialRampToValueAtTime(0.0001, end);
   master.connect(ctx.destination);
 
@@ -851,10 +970,40 @@ function playDing() {
   ns.start(t0); ns.stop(t0 + 0.04);
 }
 
+// the guillotine cutter: a quick blade "shik" swept down, then a low chassis thunk
+function playSnip() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const nb = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.09), ctx.sampleRate);
+  const nd = nb.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const ns = ctx.createBufferSource(); ns.buffer = nb;
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.1;
+  bp.frequency.setValueAtTime(5200, t0);
+  bp.frequency.exponentialRampToValueAtTime(1300, t0 + 0.07);
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.0001, t0);
+  ng.gain.exponentialRampToValueAtTime(0.5, t0 + 0.004);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.085);
+  ns.connect(bp).connect(ng).connect(ctx.destination);
+  ns.start(t0); ns.stop(t0 + 0.09);
+
+  const o = ctx.createOscillator(); o.type = "triangle";
+  o.frequency.setValueAtTime(180, t0 + 0.05);
+  o.frequency.exponentialRampToValueAtTime(70, t0 + 0.17);
+  const og = ctx.createGain();
+  og.gain.setValueAtTime(0.0001, t0 + 0.05);
+  og.gain.exponentialRampToValueAtTime(0.3, t0 + 0.066);
+  og.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+  o.connect(og).connect(ctx.destination);
+  o.start(t0 + 0.05); o.stop(t0 + 0.22);
+}
+
 function printFx() {
   try {
-    // print noise runs for the feed, then stops ~0.3s before the bell so the ding lands clean
-    if (settings.sound) playPrintSound(PRINT_MS - 300);
+    // sequence: the feed buzz runs, then the cutter snips the paper, then the bell rings
+    if (settings.sound) playPrintSound(PRINT_MS - 500);
     if (navigator.vibrate) {
       const pat = [];
       let total = 0;
@@ -867,8 +1016,8 @@ function printFx() {
       pat.push(90); // final thunk
       navigator.vibrate(pat);
     }
-    // the bell rings once the whole bill has printed out (after the print-out animation finishes)
-    setTimeout(() => { if (settings.sound) playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS + 60);
+    if (settings.sound) setTimeout(playSnip, PRINT_MS - 180);             // cutter, after the feed
+    setTimeout(() => { if (settings.sound) playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS + 120); // bell, last
   } catch (e) { /* audio/haptics unsupported — ignore */ }
 }
 

@@ -16,6 +16,7 @@ Env:
 """
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -90,11 +91,16 @@ def build_items():
     for b in blocks:
         t = b.get("type", "")
         if t.startswith("heading_"):
-            title = plain_text(b[t].get("rich_text")).rstrip(":").strip()
-            if not title:
+            raw = plain_text(b[t].get("rich_text")).rstrip(":").strip()
+            if not raw:
                 current = None  # skip empty/placeholder headings
                 continue
+            # pull #hashtags out of the heading -> tags; the rest is the title
+            tags = re.findall(r"#(\w[\w-]*)", raw)
+            title = re.sub(r"\s*#\w[\w-]*", "", raw).strip() or raw
             current = {"title": title, "details": [], "added": b.get("created_time")}
+            if tags:
+                current["tags"] = tags
             items.append(current)
             # toggle headings nest their bullets as children
             if b.get("has_children"):
