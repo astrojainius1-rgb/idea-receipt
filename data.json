@@ -1,11 +1,12 @@
 {
   "docTitle": "Ideas",
   "docUrl": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-  "syncedAt": "2026-06-27T06:00:43Z",
+  "syncedAt": "2026-06-27T06:10:43Z",
   "count": 3,
   "items": [
     {
       "title": "3D Printed Lamps",
+      "id": "389f61b082dc807bb9bfc6407414170e",
       "details": [
         "Design saved to Insta",
         "Use Transparent PLA for lamp",
@@ -15,6 +16,7 @@
     },
     {
       "title": "Claude Reminder",
+      "id": "389f61b082dc80409210d433436dc479",
       "details": [
         "Connects to Whatsapp/Gmail",
         "Sends message every evening at 10 P.M",
@@ -24,8 +26,44 @@
     },
     {
       "title": "Shower Speaker",
+      "id": "389f61b082dc80e4bd00fa22fd525257",
       "details": [],
       "added": "2026-06-24T19:13:00.000Z"
+    }
+  ],
+  "lists": [
+    {
+      "title": "Ideas",
+      "url": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
+      "count": 3,
+      "items": [
+        {
+          "title": "3D Printed Lamps",
+          "id": "389f61b082dc807bb9bfc6407414170e",
+          "details": [
+            "Design saved to Insta",
+            "Use Transparent PLA for lamp",
+            "Use ABS for base"
+          ],
+          "added": "2026-06-24T10:24:00.000Z"
+        },
+        {
+          "title": "Claude Reminder",
+          "id": "389f61b082dc80409210d433436dc479",
+          "details": [
+            "Connects to Whatsapp/Gmail",
+            "Sends message every evening at 10 P.M",
+            "Summary of my schedule for the following day"
+          ],
+          "added": "2026-06-24T10:38:00.000Z"
+        },
+        {
+          "title": "Shower Speaker",
+          "id": "389f61b082dc80e4bd00fa22fd525257",
+          "details": [],
+          "added": "2026-06-24T19:13:00.000Z"
+        }
+      ]
     }
   ]
 }
