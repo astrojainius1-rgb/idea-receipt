@@ -1,8 +1,8 @@
 {
   "docTitle": "Ideas",
   "docUrl": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-  "syncedAt": "2026-06-27T16:40:43Z",
-  "count": 3,
+  "syncedAt": "2026-06-27T16:50:43Z",
+  "count": 4,
   "items": [
     {
       "title": "3D Printed Lamps",
@@ -29,13 +29,21 @@
       "id": "389f61b082dc80e4bd00fa22fd525257",
       "details": [],
       "added": "2026-06-24T19:13:00.000Z"
+    },
+    {
+      "title": "Kindle supporter stubs",
+      "id": "38af61b082dc80eebd5aea5777b817e9",
+      "details": [
+        "Made from TPU (3D PRINTED)"
+      ],
+      "added": "2026-06-25T10:02:00.000Z"
     }
   ],
   "lists": [
     {
       "title": "Ideas",
       "url": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-      "count": 3,
+      "count": 4,
       "items": [
         {
           "title": "3D Printed Lamps",
@@ -62,6 +70,14 @@
           "id": "389f61b082dc80e4bd00fa22fd525257",
           "details": [],
           "added": "2026-06-24T19:13:00.000Z"
+        },
+        {
+          "title": "Kindle supporter stubs",
+          "id": "38af61b082dc80eebd5aea5777b817e9",
+          "details": [
+            "Made from TPU (3D PRINTED)"
+          ],
+          "added": "2026-06-25T10:02:00.000Z"
         }
       ]
     }
