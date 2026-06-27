@@ -27,8 +27,13 @@ API = "https://api.notion.com/v1"
 
 TOKEN = os.environ.get("NOTION_TOKEN")
 PAGE_ID = os.environ.get("NOTION_PAGE_ID", "389f61b0-82dc-815e-bebd-e072a7eca965")
-PAGE_URL = "https://app.notion.com/p/" + PAGE_ID.replace("-", "")
+# optional: NOTION_PAGE_IDS = comma-separated page ids for multiple lists (defaults to the single page)
+PAGE_IDS = [p.strip() for p in os.environ.get("NOTION_PAGE_IDS", PAGE_ID).split(",") if p.strip()]
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.json")
+
+
+def page_url(pid):
+    return "https://app.notion.com/p/" + pid.replace("-", "")
 
 
 def api_get(path):
@@ -73,9 +78,9 @@ def bullets_from(blocks):
     return details
 
 
-def page_title():
+def page_title(page_id):
     try:
-        page = api_get(f"/pages/{PAGE_ID}")
+        page = api_get(f"/pages/{page_id}")
         for prop in page.get("properties", {}).values():
             if prop.get("type") == "title":
                 return plain_text(prop.get("title")) or "Ideas"
@@ -84,9 +89,9 @@ def page_title():
     return "Ideas"
 
 
-def build_items():
+def build_items(page_id):
     items = []
-    blocks = children(PAGE_ID)
+    blocks = children(page_id)
     current = None
     for b in blocks:
         t = b.get("type", "")
@@ -98,7 +103,12 @@ def build_items():
             # pull #hashtags out of the heading -> tags; the rest is the title
             tags = re.findall(r"#(\w[\w-]*)", raw)
             title = re.sub(r"\s*#\w[\w-]*", "", raw).strip() or raw
-            current = {"title": title, "details": [], "added": b.get("created_time")}
+            current = {
+                "title": title,
+                "id": b.get("id", "").replace("-", ""),  # for the per-idea Notion deep-link
+                "details": [],
+                "added": b.get("created_time"),
+            }
             if tags:
                 current["tags"] = tags
             items.append(current)
@@ -115,18 +125,25 @@ def build_items():
 def main():
     if not TOKEN:
         sys.exit("NOTION_TOKEN is not set")
-    items = build_items()
+    lists = []
+    for pid in PAGE_IDS:
+        items = build_items(pid)
+        lists.append({"title": page_title(pid), "url": page_url(pid), "count": len(items), "items": items})
+    primary = lists[0]
     data = {
-        "docTitle": page_title(),
-        "docUrl": PAGE_URL,
+        # top-level mirrors the first list (back-compat); `lists` holds them all
+        "docTitle": primary["title"],
+        "docUrl": primary["url"],
         "syncedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "count": len(items),
-        "items": items,
+        "count": primary["count"],
+        "items": primary["items"],
+        "lists": lists,
     }
     with open(OUT, "w") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
-    print(f"wrote {len(items)} item(s) to {OUT}")
+    total = sum(len(l["items"]) for l in lists)
+    print(f"wrote {total} item(s) across {len(lists)} list(s) to {OUT}")
 
 
 if __name__ == "__main__":

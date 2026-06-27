@@ -23,6 +23,7 @@
       <div class="season-fx" id="seasonFx" aria-hidden="true"></div>
       <div class="season-fx-top" id="seasonFxTop" aria-hidden="true"></div>
       <div class="season-badge" id="seasonBadge" aria-hidden="true"></div>
+      <div class="void-stamp" id="voidStamp" aria-hidden="true">VOID</div>
       <div class="printroll">
       <div class="synced-bar"><span class="synced-ago" id="syncedAgo">synced --</span></div>
       <header class="head">
@@ -71,6 +72,8 @@
 
       <div class="coupon" id="coupon" hidden></div>
 
+      <div class="loyalty" id="loyalty"></div>
+
       <div class="rule"></div>
       <div class="billed">
         <span class="billed-label">billed to</span>
@@ -81,11 +84,21 @@
       </div>
     </section>
 
+    <div class="controls">
+      <div class="chips" id="listSwitcher" hidden></div>
+      <div class="chips" id="tagFilter" hidden></div>
+    </div>
+
     <a class="jot-btn" id="jot" href="#" target="_blank" rel="noopener">+ jot a new idea…</a>
 
     <div class="actions">
       <button class="reprint-btn" id="reprint" type="button">↻ reprint</button>
-      <button class="reprint-btn save-btn" id="save" type="button">⬇ save image</button>
+      <button class="reprint-btn save-btn" id="save" type="button">
+        <svg class="btn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/>
+        </svg>
+        <span id="saveLabel">save image</span>
+      </button>
     </div>
     <p class="hint" id="hint">auto-syncs from your Notion ideas &middot; tap an idea to cross it off</p>
   </main>

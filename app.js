@@ -67,6 +67,8 @@ function toggleDone(title, el) {
   const now = !isDone(title);
   localStorage.setItem(doneKey(title), now ? "1" : "0");
   el.classList.toggle("done", now);
+  updateTotals(); // crossing off adjusts subtotal / tax / total / count live
+  checkVoid();
 }
 
 /* ---- sorting ------------------------------------------------------------- */
@@ -456,11 +458,28 @@ function buildCode(url) {
   }
 }
 
-function render(data, animate) {
-  const items = Array.isArray(data.items) ? data.items : [];
-  const when = stamp(data.syncedAt);
+let activeList = 0;     // which Notion list is shown (when there are several)
+let activeTag = null;   // active tag filter, or null for all
+let currentItems = [];  // the items currently displayed (for live total recompute)
+let currentWhen = null;
+let currentPageUrl = "";
 
-  $("#store").textContent = (data.docTitle || "IDEA RECEIPT CO.").toUpperCase();
+// normalize to an array of lists; a single-page data.json becomes one list
+function getLists(data) {
+  if (Array.isArray(data.lists) && data.lists.length) return data.lists;
+  return [{ title: data.docTitle, url: data.docUrl, items: Array.isArray(data.items) ? data.items : [] }];
+}
+
+function render(data, animate) {
+  const lists = getLists(data);
+  if (activeList >= lists.length) activeList = 0;
+  const active = lists[activeList] || lists[0];
+  const items = Array.isArray(active.items) ? active.items : [];
+  const when = stamp(data.syncedAt);
+  currentWhen = when;
+  currentPageUrl = (active.url || data.docUrl || location.href).split("#")[0];
+
+  $("#store").textContent = (active.title || data.docTitle || "IDEA RECEIPT CO.").toUpperCase();
   $("#tagline").textContent = `est. ${when.year}`;
   $("#synced").textContent = `${when.date} ${when.time}`.trim();
   $("#order").textContent = `ORDER #${when.ymd.slice(4)}-${when.hm}`;
@@ -468,22 +487,34 @@ function render(data, animate) {
   updateSyncedAgo();
   applySeason();
 
+  buildListSwitcher(lists);
+  buildTagFilter(items);
+
   const merged = mergePending(items); // include ideas added here, awaiting next sync
+  if (activeTag && !merged.some((it) => (it.tags || []).includes(activeTag))) activeTag = null;
+  const shown = activeTag ? merged.filter((it) => (it.tags || []).includes(activeTag)) : merged;
+  currentItems = shown;
+
   const list = $("#items");
   list.innerHTML = "";
-  let subtotal = 0, totalWords = 0;
-  const titles = [];
 
-  sortItems(merged).forEach((it, i) => {
+  // figures for lifetime + history are over the WHOLE list (ignore filter/cross-off)
+  const allTitles = [];
+  let fullWords = 0, fullSub = 0;
+  merged.forEach((it) => {
+    const t = (it.title || "Untitled idea").trim();
+    allTitles.push(t);
+    const w = ideaWords(it);
+    fullWords += w; fullSub += w * unitPrice(t);
+  });
+
+  sortItems(shown).forEach((it, i) => {
     const title = (it.title || "Untitled idea").trim();
     const details = Array.isArray(it.details) ? it.details : [];
     const tags = Array.isArray(it.tags) ? it.tags : [];
     const words = ideaWords(it);
     const up = unitPrice(title);          // this idea's market rate per word
     const amt = words * up;               // price = words × this idea's going rate
-    subtotal += amt;
-    totalWords += words;
-    titles.push(title);
     const isNew = !it.pending && it.added && (Date.now() - Date.parse(it.added)) < 48 * 3600 * 1000;
 
     const row = document.createElement("div");
@@ -512,6 +543,16 @@ function render(data, animate) {
     amtEl.className = "amt";
     amtEl.textContent = money(amt);
     line.append(dots, amtEl);
+    if (it.id) { // deep-link to this exact block in Notion (doesn't trigger cross-off)
+      const link = document.createElement("a");
+      link.className = "item-link";
+      link.href = currentPageUrl + "#" + it.id;
+      link.target = "_blank"; link.rel = "noopener";
+      link.textContent = "↗";
+      link.title = "open in Notion";
+      link.addEventListener("click", (e) => e.stopPropagation());
+      line.appendChild(link);
+    }
     row.appendChild(line);
 
     if (tags.length) {
@@ -553,38 +594,31 @@ function render(data, animate) {
     list.appendChild(row);
   });
 
-  if (!merged.length) {
+  if (!shown.length) {
     const empty = document.createElement("div");
     empty.className = "qty";
     empty.style.textAlign = "center";
-    empty.textContent = "(no ideas yet — go jot one in Notion)";
+    empty.textContent = activeTag ? `(no #${activeTag} ideas)` : "(no ideas yet — go jot one in Notion)";
     list.appendChild(empty);
   }
 
-  const count = merged.length;
-  const tax = subtotal * 0.18; // 18% brain tax on the subtotal
-  $("#t-count").textContent = count;
-  $("#t-words").textContent = totalWords;
-  $("#t-subtotal").textContent = money(subtotal);
-  $("#t-tax").textContent = money(tax);
-  $("#t-total").textContent = count;
-  $("#t-grand").textContent = money(subtotal + tax); // total price due
+  updateTotals(); // totals reflect the shown, non-crossed-off ideas
 
   $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
   sloganIdx++;
 
   renderCoupon(when);
-  tallyLifetime(titles); // unique-ideas-ever counter (+ milestone flourish)
-  recordHistory(when, count, totalWords, subtotal + tax); // snapshot for the stats view
+  renderLoyalty();
+  tallyLifetime(allTitles); // unique-ideas-ever counter (+ milestone flourish)
+  recordHistory(when, merged.length, fullWords, fullSub * 1.18);
 
-  const url = data.docUrl || location.href;
-  buildCode(url);
+  buildCode(currentPageUrl);
   const jot = $("#jot");
-  if (jot) jot.href = url; // "jot a new idea" opens the Notion page itself
-  $("#barnum").textContent = group4(serial(when.ymd, count, totalWords));
+  if (jot) jot.href = currentPageUrl; // "jot a new idea" opens the active Notion page
   let host = "this receipt";
-  try { host = new URL(url).host.replace(/^www\./, ""); } catch (e) {}
+  try { host = new URL(currentPageUrl).host.replace(/^www\./, ""); } catch (e) {}
   $("#barcap").textContent = `scan → ${host}`;
+  checkVoid();
 
   if (animate) {
     const r = $("#receipt");
@@ -592,6 +626,88 @@ function render(data, animate) {
     void r.offsetWidth; // restart animation
     r.classList.add("printing");
   }
+}
+
+// totals reflect what's actually "on the bill": shown ideas that aren't crossed off
+function updateTotals() {
+  let sub = 0, w = 0, c = 0;
+  currentItems.forEach((it) => {
+    const t = (it.title || "Untitled idea").trim();
+    if (isDone(t)) return;
+    const ww = ideaWords(it);
+    sub += ww * unitPrice(t); w += ww; c++;
+  });
+  const tax = sub * 0.18;
+  $("#t-count").textContent = c;
+  $("#t-words").textContent = w;
+  $("#t-subtotal").textContent = money(sub);
+  $("#t-tax").textContent = money(tax);
+  $("#t-total").textContent = c;
+  $("#t-grand").textContent = money(sub + tax);
+  if (currentWhen) $("#barnum").textContent = group4(serial(currentWhen.ymd, c, w));
+}
+
+// all ideas crossed off → stamp the whole receipt VOID
+function checkVoid() {
+  const rows = [...document.querySelectorAll("#items .item")];
+  const allDone = rows.length > 0 && rows.every((r) => r.classList.contains("done"));
+  $("#receipt")?.classList.toggle("voided", allDone);
+}
+
+// loyalty punch card: every idea is a punch; 10 punches = a free idea
+function renderLoyalty() {
+  const el = $("#loyalty");
+  if (!el) return;
+  const life = lifetimeIdeasSet().size;
+  const inCard = life % 10;
+  const filled = (life > 0 && inCard === 0) ? 10 : inCard;
+  const rewards = Math.floor(life / 10);
+  let dots = "";
+  for (let i = 0; i < 10; i++) dots += `<span class="punch${i < filled ? " on" : ""}"></span>`;
+  const cap = filled === 10
+    ? "★ CARD FULL — A FREE IDEA IS ON US ★"
+    : `${filled}/10 punches — ${10 - filled} to a free idea`;
+  el.innerHTML =
+    `<div class="loyalty-head">IDEAS LOYALTY CARD${rewards ? ` · ${rewards} free earned` : ""}</div>` +
+    `<div class="punches">${dots}</div>` +
+    `<div class="loyalty-cap">${cap}</div>`;
+}
+
+// list switcher (only when there's more than one Notion list)
+function buildListSwitcher(lists) {
+  const el = $("#listSwitcher");
+  if (!el) return;
+  if (lists.length <= 1) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = "";
+  lists.forEach((l, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + (i === activeList ? " active" : "");
+    b.textContent = l.title || `List ${i + 1}`;
+    b.addEventListener("click", () => { activeList = i; activeTag = null; rerender(); });
+    el.appendChild(b);
+  });
+}
+
+// tag filter (only when the active list has tags)
+function buildTagFilter(items) {
+  const el = $("#tagFilter");
+  if (!el) return;
+  const tags = [...new Set(items.flatMap((it) => (it.tags || []).map((t) => String(t).trim())).filter(Boolean))].sort();
+  if (!tags.length) { el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = "";
+  const mk = (label, tag) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip" + ((tag === activeTag) || (tag === null && !activeTag) ? " active" : "");
+    b.textContent = label;
+    b.addEventListener("click", () => { activeTag = tag; rerender(); });
+    return b;
+  };
+  el.appendChild(mk("all", null));
+  tags.forEach((t) => el.appendChild(mk("#" + t, t)));
 }
 
 async function pull(initial) {
@@ -666,8 +782,11 @@ async function saveImage() {
   const btn = $("#save");
   const src = $("#receipt");
   if (!src) return;
+  const label = $("#saveLabel");
+  const setLabel = (t) => { if (label) label.textContent = t; };
   try {
-    if (btn) { btn.classList.add("busy"); btn.textContent = "rendering…"; }
+    if (btn) btn.classList.add("busy");
+    setLabel("rendering…");
     const rect = src.getBoundingClientRect();
     const w = Math.ceil(rect.width), h = Math.ceil(rect.height);
 
@@ -714,11 +833,13 @@ async function saveImage() {
     }
   } catch (e) {
     console.error("save failed", e);
-    if (btn) btn.textContent = "save failed";
-    setTimeout(() => { if (btn) btn.textContent = "⬇ save image"; }, 1500);
+    setLabel("save failed");
+    setTimeout(() => setLabel("save image"), 1500);
+    if (btn) btn.classList.remove("busy");
     return;
   }
-  if (btn) { btn.classList.remove("busy"); btn.textContent = "⬇ save image"; }
+  if (btn) btn.classList.remove("busy");
+  setLabel("save image");
 }
 $("#save")?.addEventListener("click", saveImage);
 
@@ -811,29 +932,62 @@ function buildStats() {
   if (!body) return;
   const life = lifetimeIdeasSet().size;
   const hist = loadHistory();
-  const items = (lastData && lastData.items) || [];
-  let top = null;
-  let grand = 0;
+  const lists = lastData ? getLists(lastData) : [];
+  const items = ((lists[activeList] || lists[0] || {}).items) || [];
+  let top = null, low = null, grand = 0, weekly = 0;
+  const weekAgo = Date.now() - 7 * 864e5;
   items.forEach((it) => {
     const t = (it.title || "").trim();
     const v = ideaWords(it) * unitPrice(t);
     grand += v;
     if (!top || v > top.v) top = { t, v };
+    if (!low || v < low.v) low = { t, v };
+    if (it.added && Date.parse(it.added) >= weekAgo) weekly++;
   });
   grand *= 1.18;
   const biggest = hist.reduce((m, h) => (h.count > m ? h.count : m), 0);
+  const streak = longestStreak(hist);
   const stat = (label, val) => `<div class="stat"><span>${label}</span><strong>${val}</strong></div>`;
   let grid = "";
   grid += stat("Ideas all-time", life);
-  grid += stat("On the receipt now", items.length);
+  grid += stat("On the receipt", items.length);
+  grid += stat("New this week", weekly);
   grid += stat("Current total", money(grand));
   grid += stat("Biggest day", biggest + " idea" + (biggest === 1 ? "" : "s"));
-  grid += stat("Receipts logged", hist.length);
+  grid += stat("Longest streak", streak + " day" + (streak === 1 ? "" : "s"));
   if (top) grid += stat("Priciest idea", `${top.t} — ${money(top.v)}`);
+  if (low) grid += stat("Cheapest idea", `${low.t} — ${money(low.v)}`);
+  const spark = sparkline(hist.slice(-21).map((h) => h.count));
   const rows = hist.slice(-14).reverse().map((h) =>
     `<div class="hist-row"><span>${h.date}</span><span>${h.count} idea${h.count === 1 ? "" : "s"}</span><span>${money(h.grand)}</span></div>`
   ).join("") || `<div class="hist-empty">no past receipts logged yet</div>`;
-  body.innerHTML = `<div class="stat-grid">${grid}</div><div class="hist-head">PAST RECEIPTS</div><div class="hist-list">${rows}</div>`;
+  body.innerHTML =
+    `<div class="stat-grid">${grid}</div>` +
+    (spark ? `<div class="hist-head">IDEAS OVER TIME</div>${spark}` : "") +
+    `<div class="hist-head">PAST RECEIPTS</div><div class="hist-list">${rows}</div>`;
+}
+function longestStreak(hist) {
+  const days = [...new Set(hist.map((h) => h.ymd))].sort();
+  let best = 0, cur = 0, prev = null;
+  for (const ymd of days) {
+    const d = Date.parse(ymd.slice(0, 4) + "-" + ymd.slice(4, 6) + "-" + ymd.slice(6, 8));
+    cur = (prev !== null && d - prev === 864e5) ? cur + 1 : 1;
+    if (cur > best) best = cur;
+    prev = d;
+  }
+  return best;
+}
+function sparkline(vals) {
+  if (vals.length < 2) return "";
+  const w = 260, h = 46, pad = 4;
+  const max = Math.max(...vals, 1), min = Math.min(...vals, 0), rng = (max - min) || 1;
+  const step = (w - 2 * pad) / (vals.length - 1);
+  const pts = vals.map((v, i) => {
+    const x = pad + i * step;
+    const y = h - pad - ((v - min) / rng) * (h - 2 * pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="#7d8da0" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 $("#statsBtn")?.addEventListener("click", () => { closeSheet(); openStats(); });
 $("#statsClose")?.addEventListener("click", closeStats);
