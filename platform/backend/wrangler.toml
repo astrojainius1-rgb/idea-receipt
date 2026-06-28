@@ -1,0 +1,74 @@
+# idea-receipt backend API — Cloudflare Worker config.
+#
+# This is the NEW backend ("the spine"): D1 = system of record, Vectorize = idea
+# embeddings (semantic search, AI workstream), KV = sessions + push subscriptions.
+# It is separate from the existing repo-root sync-worker.js (which only triggers the
+# GitHub Action). Deploy from this folder:  platform/backend/.
+#
+# Quick deploy (full guide in README.md and docs/PLAN-backend.md):
+#   wrangler d1 create idea_receipt
+#   wrangler vectorize create idea-receipt-ideas --dimensions=768 --metric=cosine
+#   wrangler kv namespace create SESSIONS
+#   wrangler kv namespace create PUSH_SUBS
+#   # paste the printed ids into the [[...]] blocks below, then:
+#   wrangler d1 execute idea_receipt --file=./schema.sql --remote
+#   wrangler secret put GOOGLE_CLIENT_SECRET
+#   wrangler secret put NOTION_IMPORT_TOKEN
+#   wrangler deploy
+
+name = "idea-receipt-api"
+main = "src/index.js"
+compatibility_date = "2024-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Routes ───────────────────────────────────────────────────────────────────
+# The API answers on its own subdomain. The GitHub Pages site stays where it is and
+# calls this host. (workers.dev also works for a first deploy — drop the route and
+# rely on the *.workers.dev URL printed by `wrangler deploy`.)
+# routes = [
+#   { pattern = "api.idea-receipt.<your-domain>.com", custom_domain = true }
+# ]
+
+# ── Public, non-secret vars ──────────────────────────────────────────────────
+[vars]
+# Where the PWA is served from — used for the auth cookie domain, CORS allow-list,
+# and OAuth redirect base. Comma-separated for multiple origins (local + prod).
+ALLOWED_ORIGINS = "https://astrojainius1-rgb.github.io,http://localhost:8765,http://localhost:8766"
+APP_ORIGIN      = "https://astrojainius1-rgb.github.io"
+# OAuth (Google by default; provider-agnostic — see PLAN-backend.md to swap).
+OAUTH_PROVIDER       = "google"
+GOOGLE_CLIENT_ID     = "REPLACE_WITH_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+OAUTH_REDIRECT_PATH  = "/api/auth/callback"
+SESSION_TTL_DAYS     = "30"
+# Embedding model used to fill Vectorize on idea write (Workers AI). The AI workstream
+# may override; kept here so /api/ideas writes can enqueue embeddings.
+EMBED_MODEL          = "@cf/baai/bge-base-en-v1.5"
+
+# ── D1: system of record ─────────────────────────────────────────────────────
+[[d1_databases]]
+binding       = "DB"
+database_name = "idea_receipt"
+database_id   = "REPLACE_WITH_D1_DATABASE_ID"   # from `wrangler d1 create idea_receipt`
+
+# ── KV: sessions + push subscriptions ────────────────────────────────────────
+[[kv_namespaces]]
+binding = "SESSIONS"
+id      = "REPLACE_WITH_SESSIONS_KV_ID"          # from `wrangler kv namespace create SESSIONS`
+
+[[kv_namespaces]]
+binding = "PUSH_SUBS"
+id      = "REPLACE_WITH_PUSH_SUBS_KV_ID"         # from `wrangler kv namespace create PUSH_SUBS`
+
+# ── Vectorize: idea embeddings (keyed by idea id) ────────────────────────────
+[[vectorize]]
+binding    = "IDEAS_VEC"
+index_name = "idea-receipt-ideas"                # from `wrangler vectorize create ...`
+
+# ── Workers AI: embedding generation (optional; AI workstream also uses this) ─
+[ai]
+binding = "AI"
+
+# Secrets (NOT set here — use `wrangler secret put`):
+#   GOOGLE_CLIENT_SECRET   OAuth client secret (Google)
+#   NOTION_IMPORT_TOKEN    shared bearer that the Notion importer presents to POST /api/import/notion
+#   MAGIC_LINK_SECRET      HMAC key for signing magic-link tokens (optional; auto-fallback if unset)

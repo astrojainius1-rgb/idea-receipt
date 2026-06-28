@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Save to Ideas</title>
+  <meta name="theme-color" content="#15171c" />
+  <link rel="icon" href="../../icon.png" />
+  <!-- Reuse the app shell styles so this screen matches the receipt look. -->
+  <link rel="stylesheet" href="../../styles.css" />
+  <style>
+    /* Minimal, self-contained styles for the capture card (no dependency on
+       receipt-specific classes, in case styles.css changes). */
+    .cap-wrap { max-width: 460px; margin: 0 auto; padding: 24px 18px 40px; }
+    .cap-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+                border-radius: 14px; padding: 18px; }
+    .cap-h { font: 600 15px/1.3 system-ui, sans-serif; letter-spacing: .04em;
+             text-transform: uppercase; opacity: .8; margin: 0 0 14px; }
+    .cap-field { display: block; margin: 0 0 12px; }
+    .cap-field > span { display: block; font: 500 12px/1 system-ui; opacity: .6;
+                        text-transform: uppercase; letter-spacing: .06em; margin: 0 0 5px; }
+    .cap-field input, .cap-field textarea {
+      width: 100%; box-sizing: border-box; padding: 10px 11px; border-radius: 9px;
+      border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25);
+      color: inherit; font: 400 15px/1.4 system-ui, sans-serif; }
+    .cap-field textarea { min-height: 84px; resize: vertical; }
+    .cap-row { display: flex; gap: 10px; }
+    .cap-row .cap-field { flex: 1; }
+    .cap-actions { display: flex; gap: 10px; margin-top: 6px; }
+    .cap-btn { flex: 1; padding: 12px; border-radius: 10px; border: 0; cursor: pointer;
+               font: 600 15px system-ui; }
+    .cap-save { background: #d97757; color: #fff; }
+    .cap-cancel { background: rgba(255,255,255,0.08); color: inherit; }
+    .cap-note { font: 400 13px/1.45 system-ui; opacity: .6; margin: 14px 2px 0; }
+    .cap-status { font: 500 13px system-ui; min-height: 18px; margin: 10px 2px 0; opacity: .85; }
+  </style>
+</head>
+<body>
+  <main class="cap-wrap">
+    <div class="cap-card">
+      <h1 class="cap-h">＋ Save to Ideas</h1>
+      <form id="capForm" autocomplete="off">
+        <label class="cap-field">
+          <span>Title</span>
+          <input id="fTitle" name="title" type="text" placeholder="Idea title…" required />
+        </label>
+        <label class="cap-field">
+          <span>Note</span>
+          <textarea id="fBody" name="body" placeholder="Details, links, #tags…"></textarea>
+        </label>
+        <div class="cap-row">
+          <label class="cap-field">
+            <span>Priority</span>
+            <input id="fPriority" name="priority" type="text" list="prios" value="normal" />
+            <datalist id="prios"><option>low</option><option>normal</option><option>high</option></datalist>
+          </label>
+          <label class="cap-field">
+            <span>Due</span>
+            <input id="fDue" name="due_at" type="date" />
+          </label>
+        </div>
+        <div class="cap-actions">
+          <button class="cap-btn cap-cancel" id="capCancel" type="button">Cancel</button>
+          <button class="cap-btn cap-save" id="capSave" type="submit">Save idea</button>
+        </div>
+      </form>
+      <div class="cap-status" id="capStatus"></div>
+      <p class="cap-note">
+        Shared from another app, this lands in your ideas. Saved offline if you're
+        not connected — it syncs when you're back online.
+      </p>
+    </div>
+  </main>
+
+  <script type="module">
+    // The page receives the share via the manifest's GET share_target:
+    //   ?title=…&text=…&url=…   (Android Web Share Target)
+    // It can also be opened as the "New idea" app-shortcut: ?compose=1 (blank form).
+    import { createIdea } from "./compose.js";
+    import { installAutoFlush } from "./queue.js";
+
+    installAutoFlush();
+
+    const qs = new URLSearchParams(location.search);
+    const sharedTitle = (qs.get("title") || "").trim();
+    const sharedText = (qs.get("text") || "").trim();
+    const sharedUrl = (qs.get("url") || "").trim();
+
+    const $ = (id) => document.getElementById(id);
+    const status = (m) => { $("capStatus").textContent = m || ""; };
+
+    // Some platforms put the URL inside `text` rather than `url`. Pull the first
+    // URL out of the text so we can enrich it and keep the note clean.
+    function firstUrl(s) {
+      const m = String(s || "").match(/https?:\/\/[^\s]+/);
+      return m ? m[0] : "";
+    }
+    const urlInText = firstUrl(sharedText);
+    const url = sharedUrl || urlInText;
+
+    // Prefill: title from shared title (or a guess from the URL/text); note from
+    // text + url. A shared URL becomes title + note; we try to enrich the title
+    // from the page's <title> via a best-effort fetch (CORS may block it — that's
+    // fine, we fall back to the hostname).
+    function prefill() {
+      let title = sharedTitle;
+      let body = sharedText;
+      if (url) {
+        if (body.includes(url)) body = body.replace(url, "").trim();
+        body = (body ? body + "\n" : "") + url;
+        if (!title) { try { title = new URL(url).hostname.replace(/^www\./, ""); } catch (e) {} }
+      }
+      if (!title && body) { title = body.split(/\n/)[0].slice(0, 80); }
+      $("fTitle").value = title;
+      $("fBody").value = body;
+      if (url) enrichFromUrl(url);
+    }
+
+    // Best-effort: fetch the shared page and lift its <title> for a nicer name.
+    // Cross-origin pages will usually block this; we swallow errors silently.
+    async function enrichFromUrl(u) {
+      try {
+        const res = await fetch(u, { mode: "cors" });
+        const html = await res.text();
+        const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (m && (!$("fTitle").value || isHostname($("fTitle").value))) {
+          $("fTitle").value = m[1].trim().slice(0, 120);
+        }
+      } catch (e) { /* CORS / offline — keep the hostname fallback */ }
+    }
+    function isHostname(s) { return /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(s.trim()); }
+
+    if (!qs.get("compose")) prefill();
+
+    // Redirect back to the receipt after saving (or cancelling).
+    function goHome() { location.replace("../../index.html"); }
+
+    $("capCancel").addEventListener("click", goHome);
+
+    $("capForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      status("Saving…");
+      try {
+        await createIdea({
+          title: $("fTitle").value,
+          body: $("fBody").value,
+          priority: $("fPriority").value,
+          due_at: $("fDue").value || null,
+          source: "manual",
+        });
+        // Queue is offline-safe: even if the POST hasn't flushed, the write is
+        // durably recorded and will replay. Bounce home so the user sees the receipt.
+        status("Saved ✓");
+        setTimeout(goHome, 350);
+      } catch (err) {
+        status(err.validation ? err.validation.join(" ") : "Couldn't save — try again.");
+      }
+    });
+  </script>
+</body>
+</html>
