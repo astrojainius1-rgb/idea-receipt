@@ -1,8 +1,8 @@
 {
   "docTitle": "Ideas",
   "docUrl": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-  "syncedAt": "2026-06-29T11:00:45Z",
-  "count": 4,
+  "syncedAt": "2026-06-29T11:10:45Z",
+  "count": 5,
   "items": [
     {
       "title": "3D Printed Lamps",
@@ -37,13 +37,21 @@
         "Made from TPU (3D PRINTED)"
       ],
       "added": "2026-06-25T10:02:00.000Z"
+    },
+    {
+      "title": "Airless Basketball",
+      "id": "38ef61b082dc805f919fdcf187bd2977",
+      "details": [
+        "PEBA (Siraya Tech)"
+      ],
+      "added": "2026-06-29T11:08:00.000Z"
     }
   ],
   "lists": [
     {
       "title": "Ideas",
       "url": "https://app.notion.com/p/389f61b082dc815ebebde072a7eca965",
-      "count": 4,
+      "count": 5,
       "items": [
         {
           "title": "3D Printed Lamps",
@@ -78,6 +86,14 @@
             "Made from TPU (3D PRINTED)"
           ],
           "added": "2026-06-25T10:02:00.000Z"
+        },
+        {
+          "title": "Airless Basketball",
+          "id": "38ef61b082dc805f919fdcf187bd2977",
+          "details": [
+            "PEBA (Siraya Tech)"
+          ],
+          "added": "2026-06-29T11:08:00.000Z"
         }
       ]
     }
