@@ -573,6 +573,7 @@ function render(data, animate) {
       link.target = "_blank"; link.rel = "noopener";
       link.textContent = "↗";
       link.title = "open in Notion";
+      link.setAttribute("aria-label", `open “${title}” in Notion`);
       link.addEventListener("click", (e) => e.stopPropagation());
       line.appendChild(link);
     }
@@ -582,6 +583,7 @@ function render(data, animate) {
       ai.type = "button";
       ai.textContent = "✨";
       ai.title = "expand with AI";
+      ai.setAttribute("aria-label", `expand “${title}” with AI`);
       ai.addEventListener("click", (e) => { e.stopPropagation(); expandIdea(it); });
       line.appendChild(ai);
     }
@@ -1119,6 +1121,11 @@ function showDigest() {
   aiRun("✨ This week's digest", "digest", { ideas: items });
 }
 $("#digestBtn")?.addEventListener("click", showDigest);
+$("#uncrossBtn")?.addEventListener("click", () => {
+  Object.keys(localStorage).filter((k) => k.startsWith("done:")).forEach((k) => localStorage.removeItem(k));
+  closeSheet();
+  rerender();
+});
 $("#aiClose")?.addEventListener("click", closeAiSheet);
 $("#aiSheet")?.addEventListener("click", (e) => { if (e.target.id === "aiSheet") closeAiSheet(); });
 
