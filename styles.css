@@ -792,6 +792,28 @@ html[data-theme="light"] .ptr.ready { color: #000; }
 .ai-body.ai-setup ol { padding-left: 18px; margin: 8px 0; }
 .ai-body.ai-setup li { margin: 5px 0; }
 
+/* ---- search box ---- */
+.search-box {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+.search-box::placeholder { color: rgba(255,255,255,0.45); }
+html[data-theme="light"] .search-box { color: #20242b; background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.18); }
+html[data-theme="light"] .search-box::placeholder { color: rgba(0,0,0,0.45); }
+.search-empty {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 6px 0 2px;
+}
+.search-empty[hidden] { display: none; }
+
 /* ---- list switcher / tag filter chips ---- */
 .controls { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }

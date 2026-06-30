@@ -470,6 +470,14 @@ function buildCode(url) {
 
 let activeList = 0;     // which Notion list is shown (when there are several)
 let activeTag = null;   // active tag filter, or null for all
+let searchQuery = "";   // live text search over the shown ideas
+
+// does an idea match the current search text? (title, notes, tags)
+function matchesSearch(it) {
+  if (!searchQuery) return true;
+  const hay = ((it.title || "") + " " + (it.details || []).join(" ") + " " + (it.tags || []).join(" ")).toLowerCase();
+  return hay.includes(searchQuery);
+}
 let currentItems = [];  // the items currently displayed (for live total recompute)
 let currentWhen = null;
 let currentPageUrl = "";
@@ -534,6 +542,8 @@ function render(data, animate) {
     row.title = "tap to cross off";
     row.addEventListener("click", () => toggleDone(title, row));
     row.style.setProperty("--i", animate ? i : 0);
+    row._item = it; // for live search filtering
+    if (!matchesSearch(it)) row.style.display = "none";
 
     const line = document.createElement("div");
     line.className = "item-line";
@@ -633,6 +643,7 @@ function render(data, animate) {
   }
 
   updateTotals(); // totals reflect the shown, non-crossed-off ideas
+  updateSearchEmpty();
 
   const slPool = (SEASON_SLOGANS[lastSeasonKey] || []).concat(SLOGANS); // season lines first
   $("#slogan").textContent = slPool[sloganIdx % slPool.length];
@@ -664,7 +675,7 @@ function updateTotals() {
   let sub = 0, w = 0, c = 0;
   currentItems.forEach((it) => {
     const t = (it.title || "Untitled idea").trim();
-    if (isDone(t)) return;
+    if (isDone(t) || !matchesSearch(it)) return; // crossed-off and search-filtered ideas drop out
     const ww = ideaWords(it);
     sub += ww * unitPrice(t); w += ww; c++;
   });
@@ -677,6 +688,25 @@ function updateTotals() {
   $("#t-grand").textContent = money(sub + tax);
   if (currentWhen) $("#barnum").textContent = group4(serial(currentWhen.ymd, c, w));
 }
+
+// live text search: hide non-matching rows + recompute totals, without a full re-render
+function applySearch() {
+  const box = $("#searchBox");
+  searchQuery = (box ? box.value : "").trim().toLowerCase();
+  document.querySelectorAll("#items .item").forEach((el) => {
+    el.style.display = matchesSearch(el._item) ? "" : "none";
+  });
+  updateTotals();
+  updateSearchEmpty();
+}
+function updateSearchEmpty() {
+  const el = $("#searchEmpty");
+  if (!el) return;
+  const noneVisible = currentItems.length > 0 && !currentItems.some(matchesSearch);
+  el.hidden = !(searchQuery && noneVisible);
+  if (!el.hidden) el.textContent = `(no ideas match “${searchQuery}”)`;
+}
+$("#searchBox")?.addEventListener("input", applySearch);
 
 // all ideas crossed off → stamp the whole receipt VOID
 function checkVoid() {
