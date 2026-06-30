@@ -1082,7 +1082,12 @@ async function aiRun(title, path, body) {
 function expandIdea(it) {
   aiRun("✨ " + (it.title || "Idea"), "expand", { id: it.id, title: it.title, body: (it.details || []).join("\n") });
 }
-function showDigest() { closeSheet(); aiRun("✨ This week's digest", "digest", {}); }
+function showDigest() {
+  closeSheet();
+  const lists = lastData ? getLists(lastData) : [];
+  const items = ((lists[activeList] || lists[0] || {}).items) || [];
+  aiRun("✨ This week's digest", "digest", { ideas: items });
+}
 $("#digestBtn")?.addEventListener("click", showDigest);
 $("#aiClose")?.addEventListener("click", closeAiSheet);
 $("#aiSheet")?.addEventListener("click", (e) => { if (e.target.id === "aiSheet") closeAiSheet(); });

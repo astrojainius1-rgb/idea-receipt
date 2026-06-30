@@ -814,21 +814,6 @@ html[data-theme="light"] .chip.active { color: #fff; background: #20242b; border
 /* ---- stats sparkline ---- */
 .spark { width: 100%; height: 46px; display: block; margin-top: 4px; }
 
-/* ---- torn-edge curl: soft shading just inside the top & bottom edges ---- */
-.printroll::before, .printroll::after {
-  content: ""; position: absolute; left: -6px; right: -6px; height: 16px;
-  pointer-events: none; z-index: 0;
-}
-.printroll::before {
-  top: -10px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.13), transparent);
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-}
-.printroll::after {
-  bottom: -12px;
-  background: linear-gradient(to top, rgba(0,0,0,0.13), transparent);
-  border-radius: 0 0 50% 50% / 0 0 100% 100%;
-}
 
 /* ---- "NEW" stamp on fresh ideas ---- */
 .new-stamp {
