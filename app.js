@@ -100,6 +100,7 @@ function applySeason(forceKey) {
     : !settings.season ? { key: "", badge: "" }
     : pick && pick !== "auto" ? { key: pick, badge: BADGES[pick] || "" }
     : currentSeason();
+  lastSeasonKey = s.key; // remembered so the slogan can match the season
   SEASON_KEYS.forEach((k) => r.classList.remove("season-" + k));
   if (s.key) r.classList.add("season-" + s.key);
   const badge = $("#seasonBadge");
@@ -407,6 +408,14 @@ const SLOGANS = [
   "have a brilliant day",
   "come back with more ideas",
 ];
+// season-specific slogans (mixed in ahead of the generic ones when a season is active)
+const SEASON_SLOGANS = {
+  spring: ["fresh ideas, freshly bloomed", "spring cleaning for your brain", "watch your ideas grow", "new season, new notions"],
+  summer: ["ideas served sun-warmed", "hot takes, cold lemonade", "summer of bright ideas", "soak up some inspiration"],
+  monsoon: ["ideas raining down", "let it pour — let it brainstorm", "petrichor & big plans", "stay in, think big"],
+  winter: ["ideas best served warm", "cozy up with a thought", "snowed in with ideas", "winter is for big plans"],
+};
+let lastSeasonKey = "";
 let sloganIdx = 0;
 
 // Luhn check digit, so the printed serial is *valid* like a real product barcode.
@@ -527,9 +536,12 @@ function render(data, animate) {
 
     const line = document.createElement("div");
     line.className = "item-line";
+    const faint = Math.random() < 0.12;             // occasional faint, slightly-skewed print line
+    if (faint) line.classList.add("lowink");
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = title;
+    name.style.opacity = faint ? "0.55" : (0.88 + Math.random() * 0.12).toFixed(2); // ink-density variation
     line.appendChild(name);
     if (isNew) {
       const stamp = document.createElement("span");
@@ -541,7 +553,7 @@ function render(data, animate) {
     dots.className = "dots";
     const amtEl = document.createElement("span");
     amtEl.className = "amt";
-    amtEl.textContent = money(amt);
+    amtEl.textContent = money(wordsIn(title) * up); // itemized: the idea's base; notes priced below
     line.append(dots, amtEl);
     if (it.id) { // deep-link to this exact block in Notion (doesn't trigger cross-off)
       const link = document.createElement("a");
@@ -571,9 +583,17 @@ function render(data, animate) {
       const det = document.createElement("div");
       det.className = "details";
       details.forEach((d) => {
+        const text = String(d).trim();
         const l = document.createElement("div");
         l.className = "detail";
-        l.textContent = String(d).trim();
+        l.style.opacity = (0.8 + Math.random() * 0.2).toFixed(2); // ink-density variation
+        const dt = document.createElement("span");
+        dt.className = "detail-txt";
+        dt.textContent = text;
+        const dp = document.createElement("span");
+        dp.className = "detail-amt";
+        dp.textContent = money(wordsIn(text) * up); // each note priced too (itemized)
+        l.append(dt, dp);
         det.appendChild(l);
       });
       row.appendChild(det);
@@ -604,7 +624,8 @@ function render(data, animate) {
 
   updateTotals(); // totals reflect the shown, non-crossed-off ideas
 
-  $("#slogan").textContent = SLOGANS[sloganIdx % SLOGANS.length];
+  const slPool = (SEASON_SLOGANS[lastSeasonKey] || []).concat(SLOGANS); // season lines first
+  $("#slogan").textContent = slPool[sloganIdx % slPool.length];
   sloganIdx++;
 
   renderCoupon(when);
