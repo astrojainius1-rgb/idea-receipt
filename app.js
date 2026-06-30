@@ -41,6 +41,7 @@ function agoText(iso) {
 /* ---- user settings (persisted) ------------------------------------------- */
 const DEFAULT_SETTINGS = {
   theme: "auto", sort: "default", sound: true, season: true, seasonPick: "auto", coupon: true, notify: false,
+  aiEndpoint: "", // your deployed AI worker (platform/ai); blank = AI features show a setup hint
 };
 let settings = loadSettings();
 function loadSettings() {
@@ -565,6 +566,15 @@ function render(data, animate) {
       link.addEventListener("click", (e) => e.stopPropagation());
       line.appendChild(link);
     }
+    if (!it.pending) { // ✨ expand this idea with AI (doesn't trigger cross-off)
+      const ai = document.createElement("button");
+      ai.className = "item-ai";
+      ai.type = "button";
+      ai.textContent = "✨";
+      ai.title = "expand with AI";
+      ai.addEventListener("click", (e) => { e.stopPropagation(); expandIdea(it); });
+      line.appendChild(ai);
+    }
     row.appendChild(line);
 
     if (tags.length) {
@@ -923,6 +933,7 @@ function syncSheet() {
   markSeasonPicker();
   set("#setCoupon", "checked", settings.coupon);
   set("#setNotify", "checked", settings.notify);
+  set("#setAiEndpoint", "value", settings.aiEndpoint || "");
 }
 $("#gear")?.addEventListener("click", openSheet);
 $("#sheetClose")?.addEventListener("click", closeSheet);
@@ -934,6 +945,7 @@ $("#setSound")?.addEventListener("change", (e) => { settings.sound = e.target.ch
 $("#setSeason")?.addEventListener("change", (e) => { settings.season = e.target.checked; saveSettings(); applySeason(); });
 buildSeasonPicker();
 $("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.checked; saveSettings(); rerender(); });
+$("#setAiEndpoint")?.addEventListener("change", (e) => { settings.aiEndpoint = e.target.value.trim(); saveSettings(); });
 $("#setNotify")?.addEventListener("change", async (e) => {
   if (e.target.checked) {
     if (!("Notification" in window)) { flashAdd("notifications aren't supported here"); e.target.checked = false; return; }
@@ -1013,6 +1025,67 @@ function sparkline(vals) {
 $("#statsBtn")?.addEventListener("click", () => { closeSheet(); openStats(); });
 $("#statsClose")?.addEventListener("click", closeStats);
 $("#statsSheet")?.addEventListener("click", (e) => { if (e.target.id === "statsSheet") closeStats(); });
+
+/* ---- AI features: expand + weekly digest (auto-tag & semantic search use the same
+   endpoint once the editor/search surfaces exist). Calls the user's deployed AI worker
+   at settings.aiEndpoint; shows a setup hint until that's configured. ---- */
+async function aiCall(path, body) {
+  const ep = (settings.aiEndpoint || "").trim();
+  if (!ep) throw new Error("NO_ENDPOINT");
+  const res = await fetch(ep.replace(/\/+$/, "") + "/" + path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+function openAiSheet(title) {
+  const t = $("#aiTitle"); if (t) t.textContent = title;
+  setAiText("thinking…");
+  const s = $("#aiSheet"); if (s) s.hidden = false;
+}
+function closeAiSheet() { const s = $("#aiSheet"); if (s) s.hidden = true; }
+function setAiText(str) { const b = $("#aiBody"); if (b) { b.classList.remove("ai-setup"); b.textContent = str; } }
+function setAiSetup() {
+  const b = $("#aiBody"); if (!b) return;
+  b.classList.add("ai-setup");
+  b.innerHTML =
+    "<p>AI features need your deployed AI worker.</p>" +
+    "<ol><li>Deploy <code>platform/ai</code> (see its README) with an <code>ANTHROPIC_API_KEY</code>.</li>" +
+    "<li>Paste its URL into <b>⚙️ settings → AI endpoint URL</b>.</li></ol>" +
+    "<p>Then “expand” and “weekly digest” work here. (Auto-tag &amp; semantic search arrive with the editor/search.)</p>";
+}
+function aiResultToText(r) {
+  if (typeof r === "string") return r;
+  if (!r || typeof r !== "object") return String(r);
+  if (r.text) return r.text;
+  if (r.digest) return r.digest;
+  if (r.brief || r.steps) {
+    let s = r.brief ? r.brief + "\n\n" : "";
+    if (Array.isArray(r.steps)) s += r.steps.map((x, i) => `${i + 1}. ${typeof x === "string" ? x : (x.title || JSON.stringify(x))}`).join("\n");
+    return s.trim();
+  }
+  if (Array.isArray(r.tags)) return "Suggested tags: " + r.tags.map((t) => "#" + t).join("  ");
+  return JSON.stringify(r, null, 2);
+}
+async function aiRun(title, path, body) {
+  openAiSheet(title);
+  try {
+    setAiText(aiResultToText(await aiCall(path, body)));
+  } catch (e) {
+    if (e.message === "NO_ENDPOINT") setAiSetup();
+    else setAiText("Couldn't reach the AI endpoint. Check the URL in ⚙️ settings.");
+  }
+}
+function expandIdea(it) {
+  aiRun("✨ " + (it.title || "Idea"), "expand", { id: it.id, title: it.title, body: (it.details || []).join("\n") });
+}
+function showDigest() { closeSheet(); aiRun("✨ This week's digest", "digest", {}); }
+$("#digestBtn")?.addEventListener("click", showDigest);
+$("#aiClose")?.addEventListener("click", closeAiSheet);
+$("#aiSheet")?.addEventListener("click", (e) => { if (e.target.id === "aiSheet") closeAiSheet(); });
 
 /* ---- audio unlock: resume the context on any user interaction (esp. iOS) -- */
 function unlockAudio() { const c = getCtx(); if (c && c.state === "suspended") c.resume(); }

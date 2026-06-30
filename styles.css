@@ -767,13 +767,30 @@ html[data-theme="light"] .ptr.ready { color: #000; }
 .receipt.voided .void-stamp { display: block; }
 .receipt.voided .printroll { opacity: 0.78; }
 
-/* ---- per-idea Notion deep-link ---- */
+/* ---- per-idea Notion deep-link + AI expand ---- */
 .item-link {
   align-self: center; margin-left: 7px;
   font-size: 12px; line-height: 1; text-decoration: none;
   color: var(--ink-soft); opacity: 0.55;
 }
 .item-link:active { opacity: 1; }
+.item-ai {
+  align-self: center; margin-left: 6px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: 11px; line-height: 1; opacity: 0.5;
+  -webkit-tap-highlight-color: transparent;
+}
+.item-ai:active { opacity: 1; }
+
+/* ---- AI result sheet ---- */
+.ai-body {
+  font-family: var(--mono); color: #e8e8ea; font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; max-height: 60vh; overflow-y: auto; margin-top: 6px;
+}
+.ai-body.ai-setup { white-space: normal; color: rgba(232,232,234,0.82); }
+.ai-body.ai-setup code { background: #181a1f; padding: 1px 5px; border-radius: 4px; }
+.ai-body.ai-setup ol { padding-left: 18px; margin: 8px 0; }
+.ai-body.ai-setup li { margin: 5px 0; }
 
 /* ---- list switcher / tag filter chips ---- */
 .controls { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 0; }

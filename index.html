@@ -130,7 +130,19 @@
       </div>
       <label class="set-row"><span>Coupon</span><input type="checkbox" id="setCoupon" /></label>
       <label class="set-row"><span>New-idea alerts</span><input type="checkbox" id="setNotify" /></label>
+      <label class="set-row col"><span>AI endpoint URL</span>
+        <input type="url" id="setAiEndpoint" placeholder="https://…workers.dev  (your AI worker)" />
+      </label>
+      <button class="stats-btn" id="digestBtn" type="button">&#10024; This week&rsquo;s digest</button>
       <button class="stats-btn" id="statsBtn" type="button">📊 Stats &amp; past receipts</button>
+    </div>
+  </div>
+
+  <!-- AI result sheet (expand / digest) -->
+  <div class="sheet" id="aiSheet" hidden>
+    <div class="sheet-card" role="dialog" aria-label="AI" aria-modal="true">
+      <div class="sheet-head"><span id="aiTitle">AI</span><button class="sheet-x" id="aiClose" type="button" aria-label="close">&#10005;</button></div>
+      <div id="aiBody" class="ai-body"></div>
     </div>
   </div>
 
