@@ -1,7 +1,7 @@
 /* Idea Receipt service worker — offline shell + last-known ideas.
    Shell assets are cache-first (instant load); data.json is network-first
    so you always get fresh ideas online but still see the last receipt offline. */
-const CACHE = "idea-receipt-v8";
+const CACHE = "idea-receipt-v9";
 const SHELL = [
   "./",
   "index.html",
