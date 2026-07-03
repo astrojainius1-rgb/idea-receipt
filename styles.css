@@ -896,6 +896,20 @@ body.paused .synced-ago::before { animation-play-state: paused !important; }
   100% { opacity: 0; transform: translateX(-50%) scale(1); }
 }
 
+/* ---- small transient message (settings feedback etc.) ---- */
+.app-toast {
+  position: fixed;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  z-index: 30;
+  font-family: var(--mono); font-size: 12.5px;
+  color: #fff; background: rgba(20,22,27,0.94);
+  padding: 10px 16px; border-radius: 10px; white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  pointer-events: none;
+  animation: toastPop 3.2s ease forwards;
+}
+
 /* ---- stats & past receipts modal ---- */
 .stats-btn {
   width: 100%;

@@ -928,8 +928,10 @@ function mergePending(items) {
 function rerender() { if (lastData) render(lastData, false); }
 
 // drop pending ideas that have now landed in Notion; alert on genuinely new ideas
+// (scans ALL lists, not just the first, so multi-list alerts don't miss anything)
 function reconcileIdeas(data, initial) {
-  const titles = new Set((data.items || []).map((it) => (it.title || "").trim()).filter(Boolean));
+  const everyItem = getLists(data).flatMap((l) => Array.isArray(l.items) ? l.items : []);
+  const titles = new Set(everyItem.map((it) => (it.title || "").trim()).filter(Boolean));
   let changed = false;
   for (const t of [...pendingIdeas]) if (titles.has(t)) { pendingIdeas.delete(t); changed = true; }
   if (changed) savePending();
@@ -951,6 +953,16 @@ async function notify(title, body) {
     if (reg && reg.showNotification) reg.showNotification(title, { body, icon: "icon.png", badge: "icon.png", tag: "idea" });
     else new Notification(title, { body, icon: "icon.png" });
   } catch (e) { /* notifications unsupported — ignore */ }
+}
+
+// small transient message overlay (replaces the old flashAdd, whose element is gone)
+function toast(msg) {
+  document.querySelector(".app-toast")?.remove();
+  const el = document.createElement("div");
+  el.className = "app-toast";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
 }
 
 /* ---- settings sheet ------------------------------------------------------ */
@@ -980,10 +992,10 @@ $("#setCoupon")?.addEventListener("change", (e) => { settings.coupon = e.target.
 $("#setAiEndpoint")?.addEventListener("change", (e) => { settings.aiEndpoint = e.target.value.trim(); saveSettings(); });
 $("#setNotify")?.addEventListener("change", async (e) => {
   if (e.target.checked) {
-    if (!("Notification" in window)) { flashAdd("notifications aren't supported here"); e.target.checked = false; return; }
+    if (!("Notification" in window)) { toast("notifications aren't supported here"); e.target.checked = false; return; }
     let perm = Notification.permission;
     if (perm !== "granted") perm = await Notification.requestPermission();
-    if (perm !== "granted") { e.target.checked = false; settings.notify = false; saveSettings(); flashAdd("notification permission was denied"); return; }
+    if (perm !== "granted") { e.target.checked = false; settings.notify = false; saveSettings(); toast("notification permission was denied"); return; }
   }
   settings.notify = e.target.checked;
   saveSettings();
@@ -1085,9 +1097,9 @@ function setAiSetup() {
   b.classList.add("ai-setup");
   b.innerHTML =
     "<p>AI features need your deployed AI worker.</p>" +
-    "<ol><li>Deploy <code>platform/ai</code> (see its README) with an <code>ANTHROPIC_API_KEY</code>.</li>" +
-    "<li>Paste its URL into <b>⚙️ settings → AI endpoint URL</b>.</li></ol>" +
-    "<p>Then “expand” and “weekly digest” work here. (Auto-tag &amp; semantic search arrive with the editor/search.)</p>";
+    "<ol><li>Deploy <code>platform/ai-lite/worker.js</code> as a Cloudflare Worker (setup steps are in its header comment) with an <code>ANTHROPIC_API_KEY</code> secret.</li>" +
+    "<li>Paste the worker URL into <b>⚙️ settings → AI endpoint URL</b>.</li></ol>" +
+    "<p>Then “expand” and “weekly digest” work here.</p>";
 }
 function aiResultToText(r) {
   if (typeof r === "string") return r;
@@ -1302,7 +1314,7 @@ function playSnip() {
 function printFx() {
   try {
     // sequence: the feed buzz runs, then the cutter snips the paper, then the bell rings
-    if (settings.sound) playPrintSound(PRINT_MS - 500);
+    if (settings.sound) playPrintSound(PRINT_MS - 250); // feed fades right where the snip lands
     if (navigator.vibrate) {
       const pat = [];
       let total = 0;
@@ -1315,7 +1327,7 @@ function printFx() {
       pat.push(90); // final thunk
       navigator.vibrate(pat);
     }
-    if (settings.sound) setTimeout(playSnip, PRINT_MS - 180);             // cutter, after the feed
+    if (settings.sound) setTimeout(playSnip, PRINT_MS - 220);             // cutter, as the feed fades
     setTimeout(() => { if (settings.sound) playDing(); if (navigator.vibrate) navigator.vibrate(60); }, PRINT_MS + 120); // bell, last
   } catch (e) { /* audio/haptics unsupported — ignore */ }
 }
